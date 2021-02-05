@@ -313,11 +313,11 @@ RenderDeviceD3D12Impl::RenderDeviceD3D12Impl(IReferenceCounters*          pRefCo
 
         m_DeviceCaps.Features.ShaderResourceRuntimeArray = DEVICE_FEATURE_STATE_ENABLED;
 
-#define CHECK_REQUIRED_FEATURE(Feature, FeatureName)                          \
-    do                                                                        \
-    {                                                                         \
-        if (EngineCI.Features.Feature == DEVICE_FEATURE_STATE_ENABLED &&      \
-            m_DeviceCaps.Features.Feature != DEVICE_FEATURE_STATE_ENABLED)    \
+#define CHECK_REQUIRED_FEATURE(Feature, FeatureName)                           \
+    do                                                                         \
+    {                                                                          \
+        if (EngineCI.Features.Feature == DEVICE_FEATURE_STATE_ENABLED &&       \
+            m_DeviceCaps.Features.Feature != DEVICE_FEATURE_STATE_ENABLED)     \
             LOG_ERROR_AND_THROW(FeatureName, " not supported by this device"); \
     } while (false)
 
@@ -831,7 +831,6 @@ DescriptorHeapAllocation RenderDeviceD3D12Impl::AllocateGPUDescriptors(D3D12_DES
 void RenderDeviceD3D12Impl::CreateRootSignature(const RefCntAutoPtr<PipelineResourceSignatureD3D12Impl>* ppSignatures, Uint32 SignatureCount, RootSignatureD3D12** ppRootSig)
 {
     RootSignatureD3D12* pRootSigD3D12(NEW_RC_OBJ(m_RootSignatureAllocator, "RootSignatureD3D12 instance", RootSignatureD3D12)(this, ppSignatures, SignatureCount));
-    pRootSigD3D12->AddRef();
     *ppRootSig = pRootSigD3D12;
 }
 

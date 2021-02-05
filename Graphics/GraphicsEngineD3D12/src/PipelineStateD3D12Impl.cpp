@@ -481,7 +481,7 @@ void PipelineStateD3D12Impl::CreateDefaultResourceSignature(const PipelineStateC
 
         GetDevice()->CreatePipelineResourceSignature(ResSignDesc, ppImplicitSignature, true);
 
-        if (ppImplicitSignature == nullptr)
+        if (*ppImplicitSignature == nullptr)
             LOG_ERROR_AND_THROW("Failed to create resource signature for pipeline state");
     }
 }
@@ -560,6 +560,8 @@ void PipelineStateD3D12Impl::InitRootSignature(const PipelineStateCreateInfo& Cr
             auto* pSignature = GetSignature(Sig);
             if (pSignature != nullptr)
             {
+                const Uint32 FirstSpace = pSignature->GetBaseRegisterSpace();
+
                 for (Uint32 r = 0, ResCount = pSignature->GetTotalResourceCount(); r < ResCount; ++r)
                 {
                     const auto& ResDesc = pSignature->GetResourceDesc(r);
@@ -567,7 +569,7 @@ void PipelineStateD3D12Impl::InitRootSignature(const PipelineStateCreateInfo& Cr
 
                     if (ResDesc.ShaderStages & ShaderType)
                     {
-                        auto IsUnique = ResourceMap.emplace(HashMapStringKey{ResDesc.Name}, ResourceBinding::BindInfo{Attribs.BindPoint, Attribs.Space}).second;
+                        auto IsUnique = ResourceMap.emplace(HashMapStringKey{ResDesc.Name}, ResourceBinding::BindInfo{Attribs.BindPoint, Attribs.Space + FirstSpace}).second;
                         VERIFY(IsUnique, "resource name must be unique");
                     }
                 }
@@ -576,7 +578,7 @@ void PipelineStateD3D12Impl::InitRootSignature(const PipelineStateCreateInfo& Cr
                 {
                     const auto&               ImtblSam = pSignature->GetImmutableSamplerDesc(samp);
                     const auto&               SampAttr = pSignature->GetImmutableSamplerAttribs(samp);
-                    ResourceBinding::BindInfo BindInfo{SampAttr.ShaderRegister, SampAttr.RegisterSpace};
+                    ResourceBinding::BindInfo BindInfo{SampAttr.ShaderRegister, SampAttr.RegisterSpace + FirstSpace};
 
                     if (ImtblSam.ShaderStages & ShaderType)
                     {
@@ -593,26 +595,28 @@ void PipelineStateD3D12Impl::InitRootSignature(const PipelineStateCreateInfo& Cr
             }
         }
 
+        // AZ TODO: add local root signature to ResourceMap
+
         for (size_t i = 0; i < Shaders.size(); ++i)
         {
             auto*             pShader   = Shaders[i];
             auto&             pBytecode = ByteCodes[i];
             CComPtr<ID3DBlob> pBlob;
 
-            if (DXBCUtils::IsDXBC(pBytecode))
-            {
-                D3DCreateBlob(pBytecode->GetBufferSize(), &pBlob);
-                memcpy(pBlob->GetBufferPointer(), pBytecode->GetBufferPointer(), pBytecode->GetBufferSize());
-
-                if (!DXBCUtils::RemapResourceBindings(ResourceMap, pBlob))
-                    LOG_ERROR_AND_THROW("Failed to remap resource bindings in shader '", pShader->GetDesc().Name, "'.");
-            }
-            else
+            if (IsDXILBytecode(pBytecode->GetBufferPointer(), pBytecode->GetBufferSize()))
             {
                 if (!compiler)
                     LOG_ERROR_AND_THROW("DXC compiler is not exists, can not remap resource bindings");
 
                 if (!compiler->RemapResourceBindings(ResourceMap, reinterpret_cast<IDxcBlob*>(pBytecode.p), reinterpret_cast<IDxcBlob**>(&pBlob)))
+                    LOG_ERROR_AND_THROW("Failed to remap resource bindings in shader '", pShader->GetDesc().Name, "'.");
+            }
+            else
+            {
+                D3DCreateBlob(pBytecode->GetBufferSize(), &pBlob);
+                memcpy(pBlob->GetBufferPointer(), pBytecode->GetBufferPointer(), pBytecode->GetBufferSize());
+
+                if (!DXBCUtils::RemapResourceBindings(ResourceMap, pBlob->GetBufferPointer(), pBlob->GetBufferSize()))
                     LOG_ERROR_AND_THROW("Failed to remap resource bindings in shader '", pShader->GetDesc().Name, "'.");
             }
             pBytecode = pBlob;
@@ -695,13 +699,11 @@ PipelineStateD3D12Impl::PipelineStateD3D12Impl(IReferenceCounters*              
 
             for (const auto& Stage : ShaderStages)
             {
-                VERIFY_EXPR(Stage.Shaders.size() == 1);
-                auto* pShaderD3D12 = Stage.Shaders[0];
-                auto  ShaderType   = pShaderD3D12->GetDesc().ShaderType;
-                VERIFY_EXPR(ShaderType == Stage.Type);
+                VERIFY_EXPR(Stage.Count() == 1);
+                const auto& pByteCode = Stage.ByteCodes[0];
 
                 D3D12_SHADER_BYTECODE* pd3d12ShaderBytecode = nullptr;
-                switch (ShaderType)
+                switch (Stage.Type)
                 {
                     // clang-format off
                     case SHADER_TYPE_VERTEX:   pd3d12ShaderBytecode = &d3d12PSODesc.VS; break;
@@ -712,7 +714,6 @@ PipelineStateD3D12Impl::PipelineStateD3D12Impl(IReferenceCounters*              
                     // clang-format on
                     default: UNEXPECTED("Unexpected shader type");
                 }
-                auto* pByteCode = pShaderD3D12->GetShaderByteCode();
 
                 pd3d12ShaderBytecode->pShaderBytecode = pByteCode->GetBufferPointer();
                 pd3d12ShaderBytecode->BytecodeLength  = pByteCode->GetBufferSize();
@@ -799,13 +800,11 @@ PipelineStateD3D12Impl::PipelineStateD3D12Impl(IReferenceCounters*              
 
             for (const auto& Stage : ShaderStages)
             {
-                VERIFY_EXPR(Stage.Shaders.size() == 1);
-                auto* pShaderD3D12 = Stage.Shaders[0];
-                auto  ShaderType   = pShaderD3D12->GetDesc().ShaderType;
-                VERIFY_EXPR(ShaderType == Stage.Type);
+                VERIFY_EXPR(Stage.Count() == 1);
+                const auto& pByteCode = Stage.ByteCodes[0];
 
                 D3D12_SHADER_BYTECODE* pd3d12ShaderBytecode = nullptr;
-                switch (ShaderType)
+                switch (Stage.Type)
                 {
                     // clang-format off
                     case SHADER_TYPE_AMPLIFICATION: pd3d12ShaderBytecode = &d3d12PSODesc.AS; break;
@@ -814,7 +813,6 @@ PipelineStateD3D12Impl::PipelineStateD3D12Impl(IReferenceCounters*              
                     // clang-format on
                     default: UNEXPECTED("Unexpected shader type");
                 }
-                auto* pByteCode = pShaderD3D12->GetShaderByteCode();
 
                 pd3d12ShaderBytecode->pShaderBytecode = pByteCode->GetBufferPointer();
                 pd3d12ShaderBytecode->BytecodeLength  = pByteCode->GetBufferSize();
@@ -891,8 +889,8 @@ PipelineStateD3D12Impl::PipelineStateD3D12Impl(IReferenceCounters*              
         D3D12_COMPUTE_PIPELINE_STATE_DESC d3d12PSODesc = {};
 
         VERIFY_EXPR(ShaderStages[0].Type == SHADER_TYPE_COMPUTE);
-        VERIFY_EXPR(ShaderStages[0].Shaders.size() == 1);
-        auto* pByteCode                 = ShaderStages[0].Shaders[0]->GetShaderByteCode();
+        VERIFY_EXPR(ShaderStages[0].Count() == 1);
+        const auto& pByteCode           = ShaderStages[0].ByteCodes[0];
         d3d12PSODesc.CS.pShaderBytecode = pByteCode->GetBufferPointer();
         d3d12PSODesc.CS.BytecodeLength  = pByteCode->GetBufferSize();
 
@@ -984,6 +982,7 @@ void PipelineStateD3D12Impl::Destruct()
     TPipelineStateBase::Destruct();
 
     m_Signatures.fill({});
+    m_RootSig.Release();
 
     auto& RawAllocator = GetRawAllocator();
     if (m_pRawMem)

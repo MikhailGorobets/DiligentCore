@@ -283,23 +283,30 @@ RootSignatureCacheD3D12::~RootSignatureCacheD3D12()
 
 RefCntAutoPtr<RootSignatureD3D12> RootSignatureCacheD3D12::GetRootSig(const RefCntAutoPtr<PipelineResourceSignatureD3D12Impl>* ppSignatures, Uint32 SignatureCount)
 {
-    RefCntAutoPtr<RootSignatureD3D12> pNewRootSig;
+    RootSignatureD3D12* pNewRootSig = nullptr;
     m_DeviceD3D12Impl.CreateRootSignature(ppSignatures, SignatureCount, &pNewRootSig);
 
     if (pNewRootSig == nullptr)
         return {};
 
     RefCntAutoPtr<RootSignatureD3D12> Result;
+    bool                              Inserted = false;
     {
         std::lock_guard<std::mutex> Lock{m_RootSigCacheGuard};
 
         auto IterAndFlag = m_RootSigCache.insert(pNewRootSig);
+        Inserted         = IterAndFlag.second;
 
-        if (IterAndFlag.second)
-            pNewRootSig.Detach()->Finalize();
+        if (Inserted)
+            pNewRootSig->Finalize();
 
-        Result.Attach(*IterAndFlag.first);
+        Result = *IterAndFlag.first;
     }
+
+    // Destroy outside of mutex scope.
+    if (!Inserted)
+        pNewRootSig->~RootSignatureD3D12();
+
     return Result;
 }
 

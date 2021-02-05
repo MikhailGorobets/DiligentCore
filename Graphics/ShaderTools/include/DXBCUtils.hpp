@@ -41,13 +41,12 @@ struct DXBCUtils
     using BindInfo            = ResourceBinding::BindInfo;
     using TResourceBindingMap = ResourceBinding::TMap;
 
-    static bool IsDXBC(ID3DBlob* pBytecode);
-
     /// \param [in]    ResourceMap - Resource binding map. For every resource in the
     ///                              byte code it must define the binding (shader register).
     /// \param [inout] pBytecode   - Byte code that will be patched.
     static bool RemapResourceBindings(const TResourceBindingMap& ResourceMap,
-                                      ID3DBlob*                  pBytecode);
+                                      void*                      pBytecode,
+                                      size_t                     Size);
 };
 
 } // namespace Diligent

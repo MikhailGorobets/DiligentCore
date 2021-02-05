@@ -114,5 +114,6 @@ public:
 // path is used.
 std::unique_ptr<IDXCompiler> CreateDXCompiler(DXCompilerTarget Target, const char* pLibraryName);
 
+bool IsDXILBytecode(const void* pBytecode, size_t Size);
 
 } // namespace Diligent

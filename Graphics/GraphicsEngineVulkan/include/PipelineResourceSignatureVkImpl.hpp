@@ -125,7 +125,8 @@ public:
 
         static_assert((1u << _DescrTypeBits) >= static_cast<Uint32>(DescriptorType::Count), "Not enough bits to store DescriptorType values");
         static_assert((1u << _DescrSetBits) >= MAX_DESCRIPTOR_SETS, "Not enough bits to store descriptor set index");
-        static_assert((1u << _BindingIndexBits) >= MAX_DESCRIPTOR_SETS, "Not enough bits to store resource binding index");
+        static_assert((1u << _BindingIndexBits) >= MAX_RESOURCES_IN_SIGNATURE, "Not enough bits to store resource binding index");
+        static_assert((1u << _SamplerIndBits) >= MAX_RESOURCES_IN_SIGNATURE, "Not enough bits to store sampler resource index");
 
     public:
         static constexpr Uint32 InvalidSamplerInd = (1u << _SamplerIndBits) - 1;
