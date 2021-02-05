@@ -975,6 +975,119 @@ bool DXCompilerImpl::PatchDXIL(const TResourceBindingMap& ResourceMap, String& D
         // !"g_ColorBuffer", i32 0, i32 1,
         //                               ^
     }
+
+    // Patch createHandle command
+    static const String CallHandlePattern = " = call %dx.types.Handle @dx.op.createHandle(";
+    static const String SamplerPart       = "_sampler";
+    static const String CBufferPart       = "_cbuffer";
+    static const String TexturePart       = "_texture_";
+    static const String UAVPart           = "_UAV_";
+
+    for (size_t startPos = 0; startPos < DXIL.size();)
+    {
+        // declare %dx.types.Handle @dx.op.createHandle(
+        //        i32,                  ; opcode
+        //        i8,                   ; resource class: SRV=0, UAV=1, CBV=2, Sampler=3
+        //        i32,                  ; resource range ID (constant)
+        //        i32,                  ; index into the range
+        //        i1)                   ; non-uniform resource index: false or true
+
+        // Example:
+        //
+        // %cbConstants_cbuffer = call %dx.types.Handle @dx.op.createHandle(i32 57, i8 2, i32 0, i32 0, i1 false)
+
+        size_t callHandlePos = DXIL.find(CallHandlePattern, startPos);
+        if (callHandlePos == String::npos)
+            break;
+
+        startPos = callHandlePos + CallHandlePattern.length();
+
+        size_t resNameEnd   = callHandlePos;
+        size_t resNameStart = resNameEnd - 1;
+        bool   partFound    = false;
+        for (auto& pos = resNameStart; pos >= 0; --pos)
+        {
+            const char c = DXIL[pos];
+
+            if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))
+                continue;
+
+            if (c == '_')
+            {
+                String part = DXIL.substr(pos, resNameEnd - pos);
+                if (!partFound &&
+                    (part == SamplerPart || part == CBufferPart ||
+                     (part.length() > TexturePart.length() && strncmp(part.c_str(), TexturePart.c_str(), TexturePart.length()) == 0) ||
+                     (part.length() > UAVPart.length() && strncmp(part.c_str(), UAVPart.c_str(), UAVPart.length()) == 0)))
+                {
+                    resNameEnd = pos;
+                    partFound  = true;
+                }
+                continue;
+            }
+
+            VERIFY_EXPR(c == '%');
+            ++pos;
+            break;
+        }
+
+        String resName = DXIL.substr(resNameStart, resNameEnd - resNameStart);
+
+        auto Iter = ResourceMap.find(HashMapStringKey{resName.c_str()});
+        if (Iter == ResourceMap.end())
+        {
+            UNEXPECTED("Resource is not exists in ResourceMap");
+            continue;
+        }
+
+        size_t pos = startPos;
+
+        // skip opcode
+        // createHandle(i32 57, i8 2, i32 0, i32 0, i1 false)
+        //                    ^
+        pos = DXIL.find(',', pos + 1);
+        VERIFY_EXPR(pos != String::npos);
+        VERIFY_EXPR(DXIL[pos + 2] == 'i');
+        VERIFY_EXPR(DXIL[pos + 3] == '8');
+
+        // skip resource class
+        // createHandle(i32 57, i8 2, i32 0, i32 0, i1 false)
+        //                          ^
+        pos = DXIL.find(',', pos + 1);
+        VERIFY_EXPR(pos != String::npos);
+        VERIFY_EXPR(DXIL[pos + 2] == 'i');
+        VERIFY_EXPR(DXIL[pos + 3] == '3');
+        VERIFY_EXPR(DXIL[pos + 4] == '2');
+
+        // skip resource range ID
+        // createHandle(i32 57, i8 2, i32 0, i32 0, i1 false)
+        //                                 ^
+        pos = DXIL.find(',', pos + 1);
+        VERIFY_EXPR(pos != String::npos);
+        VERIFY_EXPR(DXIL[pos + 2] == 'i');
+        VERIFY_EXPR(DXIL[pos + 3] == '3');
+        VERIFY_EXPR(DXIL[pos + 4] == '2');
+        VERIFY_EXPR(DXIL[pos + 5] == ' ');
+
+        const size_t indexStartPos = pos + 6;
+
+        // find index end
+        // createHandle(i32 57, i8 2, i32 0, i32 0, i1 false)
+        //                                        ^
+        pos = DXIL.find(',', pos + 1);
+        VERIFY_EXPR(pos != String::npos);
+        VERIFY_EXPR(DXIL[pos + 2] == 'i');
+        VERIFY_EXPR(DXIL[pos + 3] == '1');
+        VERIFY_EXPR(DXIL[pos + 4] == ' ');
+
+        const size_t indexEndPos = pos;
+
+        // replace index
+        String BindPointStr = std::to_string(Iter->second.BindPoint);
+        DXIL.replace(DXIL.begin() + indexStartPos, DXIL.begin() + indexEndPos, BindPointStr);
+
+        startPos = indexStartPos + BindPointStr.length();
+    }
     return RemappingOK;
 }
 

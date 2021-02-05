@@ -1391,7 +1391,7 @@ TEST_F(PipelineResourceSignatureTest, FormattedBuffers)
 
     pSwapChain->Present();
 }
-
+/*
 TEST_F(PipelineResourceSignatureTest, VulkanDescriptorIndexing)
 {
     const std::string DescrIndexingTest_CS{R"(
@@ -1519,5 +1519,5 @@ void main ()
     DispatchComputeAttribs dispathAttribs{1, 1, 1};
     pContext->DispatchCompute(dispathAttribs);
 }
-
+*/
 } // namespace Diligent
