@@ -311,12 +311,14 @@ RenderDeviceD3D12Impl::RenderDeviceD3D12Impl(IReferenceCounters*          pRefCo
             }
         }
 
+        m_DeviceCaps.Features.ShaderResourceRuntimeArray = DEVICE_FEATURE_STATE_ENABLED;
+
 #define CHECK_REQUIRED_FEATURE(Feature, FeatureName)                          \
     do                                                                        \
     {                                                                         \
         if (EngineCI.Features.Feature == DEVICE_FEATURE_STATE_ENABLED &&      \
             m_DeviceCaps.Features.Feature != DEVICE_FEATURE_STATE_ENABLED)    \
-            LOG_ERROR_AND_THROW(FeatureName, "not supported by this device"); \
+            LOG_ERROR_AND_THROW(FeatureName, " not supported by this device"); \
     } while (false)
 
         // clang-format off
@@ -334,7 +336,7 @@ RenderDeviceD3D12Impl::RenderDeviceD3D12Impl(IReferenceCounters*          pRefCo
 #undef CHECK_REQUIRED_FEATURE
 
 #if defined(_MSC_VER) && defined(_WIN64)
-        static_assert(sizeof(DeviceFeatures) == 32, "Did you add a new feature to DeviceFeatures? Please handle its satus here.");
+        static_assert(sizeof(DeviceFeatures) == 33, "Did you add a new feature to DeviceFeatures? Please handle its satus here.");
 #endif
 
         auto& TexCaps = m_DeviceCaps.TexCaps;
