@@ -156,7 +156,7 @@ public:
         {
             return pSrvCbvUavHeap == rhs.pSrvCbvUavHeap && pSamplerHeap == rhs.pSamplerHeap;
         }
-        operator bool() const
+        explicit operator bool() const
         {
             return pSrvCbvUavHeap != nullptr || pSamplerHeap != nullptr;
         }
