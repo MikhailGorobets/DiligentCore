@@ -2482,6 +2482,10 @@ DILIGENT_TYPED_ENUM(SHADING_RATE_CAP_FLAGS, Uint16)
     /// Allows to read current shading rate in the pixel shader.
     /// HLSL: in SV_ShadingRate, GLSL: gl_ShadingRate.
     SHADING_RATE_CAP_FLAG_SHADING_RATE_SHADER_INPUT = 1u << 9,
+
+    /// Indicates that VRS texture will be accessed on the GPU side.
+    /// Otherwise texture content will be accessed on the CPU side when render pass will begin.
+    SHADING_RATE_CAP_FLAG_TEXTURE_DEVICE_ACCESS     = 1u << 10,
 };
 DEFINE_FLAG_ENUM_OPERATORS(SHADING_RATE_CAP_FLAGS);
 
