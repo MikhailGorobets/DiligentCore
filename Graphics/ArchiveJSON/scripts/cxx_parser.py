@@ -1,0 +1,185 @@
+# ----------------------------------------------------------------------------
+# Copyright 2019-2021 Diligent Graphics LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# In no event and under no legal theory, whether in tort (including negligence),
+# contract, or otherwise, unless required by applicable law (such as deliberate
+# and grossly negligent acts) or agreed to in writing, shall any Contributor be
+# liable for any damages, including any direct, indirect, special, incidental,
+# or consequential damages of any character arising as a result of this License or
+# out of the use or inability to use the software (including but not limited to damages
+# for loss of goodwill, work stoppage, computer failure or malfunction, or any and
+# all other commercial damages or losses), even if such Contributor has been advised
+# of the possibility of such damages.
+# ----------------------------------------------------------------------------
+
+import sys
+import typing
+import os
+import subprocess
+import re
+
+from argparse import ArgumentParser
+from clang.cindex import Index, Type, TypeKind, Cursor, CursorKind, AccessSpecifier, TranslationUnit
+from difflib import get_close_matches
+from pathlib import Path
+from cxx_config import *
+from cxx_builder import CXXBuilder
+from cxx_template import *
+
+CXX_INCLUDE_FILE = '#include "{}"'
+CXX_PRAGMA_ONCE = "#pragma once"
+CXX_NAMESPACE = "namespace {}"
+CXX_PREFIX_FILE = "Generated_"
+CXX_SUFFIX_FILE = ".hpp"
+
+CXX_PATTERN_INTERFACE = "(Diligent::I[A-Z])|(struct I[A-Z])"
+CXX_PATTERN_STRING = "(const char *)|(const Diligent::Char *)"
+
+
+def filter_by_file(nodes: typing.Iterable[Cursor], file_name: str) -> typing.Iterable[Cursor]:
+    result = []
+    for node in nodes:
+        if node.location.file.name == file_name:
+            result.append(node)
+    return result
+
+def filter_by_node_kind(nodes: typing.Iterable[Cursor], kinds: list) -> typing.Iterable[Cursor]:
+    result = []   
+    for node in nodes:
+        if node.kind in kinds:
+            result.append(node)
+    return result
+
+def find_all_fields(cursor: Cursor) -> typing.Iterable[typing.Tuple[str, Type]]:
+    result = []
+    field_declarations = filter_by_node_kind(cursor.get_children(), [CursorKind.FIELD_DECL, CursorKind.UNION_DECL])
+    reference_types = [TypeKind.POINTER]
+    for node in field_declarations:  
+        if (re.match(CXX_PATTERN_STRING, node.type.spelling)) is not None:
+            result.append({ 'name': node.displayname, 'type': node.type.spelling, 'reference': True, 'meta': 'string' })
+        elif re.match(CXX_PATTERN_INTERFACE, node.type.spelling) is not None:
+            if node.type.spelling in CXX_REGISTERED_INTERFACES:
+                result.append({ 'name': node.displayname, 'type': node.type.spelling, 'reference': True, 'meta': 'interface' })
+        elif (node.type.get_declaration().is_anonymous()):
+            for union in node.get_children():
+                result.append({ 'name': union.displayname, 'type': union.type.spelling, 'reference': union.type.kind in reference_types, 'meta': 'union' })
+        else:
+            result.append({ 'name': node.displayname, 'type': node.type.spelling, 'reference': node.type.kind in reference_types, 'meta': '' })
+    return result
+
+def find_all_base_structs(cursor: Cursor):
+    result = []
+    for node in cursor.get_children():
+        if node.kind == CursorKind.CXX_BASE_SPECIFIER:
+            result.append(node.referenced.spelling)
+    return result 
+
+def find_all_xitems(cursor: Cursor) -> typing.Iterable[str]:
+    result = []
+    xitems = []
+    for node in filter_by_node_kind(cursor.get_children(), [CursorKind.ENUM_CONSTANT_DECL]):
+        xitems.append(node.displayname)
+
+    for x, y in zip(xitems, replace_enum_string(xitems)):
+        result.append({ 'value': x, 'name': y})
+    return result
+
+def compute_all_enums(enums):
+    result = {}
+    for enum in enums:
+        if enum.spelling in CXX_REGISTERED_ENUM:
+            result[enum.spelling] = find_all_xitems(enum)
+    return result
+
+def compute_all_structs(structs):
+    result = {}
+    for struct in structs:
+        if struct.spelling in CXX_REGISTERED_STRUCT:
+            result[struct.spelling] = { 'fields': find_all_fields(struct), 'inheritance': find_all_base_structs(struct)}
+    return result
+
+def compute_all_fields_size(struct_field_map):
+    size_fields_map = {}
+    for struct, node_info in struct_field_map.items():
+        fields = struct_field_map[struct]['fields']
+        result = {}
+        for field in fields:
+            if field['reference']:
+                match_list = map(lambda x: x['name'], filter(lambda x:  not x['reference'], fields))
+                match_str = get_close_matches(field['name'], match_list)
+                if match_str:
+                    result[field['name']] = match_str[0]
+        if result:
+            size_fields_map[struct] = result
+    return size_fields_map
+
+def replace_enum_string(strings: typing.Iterable[str]) -> typing.Iterable[str]:
+    result = []
+    prefix = os.path.commonprefix(strings)
+    for string in strings:
+        replaced = string.replace(prefix, '')
+        result.append(replaced)
+    return result
+
+def parse_file(input_file_name, output_file_name):
+    index = Index.create()
+    translation_unit = index.parse(input_file_name, args=['-std=c++14'])
+    source = filter_by_file(translation_unit.cursor.get_children(), translation_unit.spelling)
+
+    cpp = CXXBuilder()
+    cpp.write_line(CXX_LICENCE)
+    cpp.write_line(CXX_PRAGMA_ONCE)
+    cpp.write_line()
+    cpp.write_line(CXX_INCLUDE_FILE.format(os.path.basename(input_file_name)))
+    cpp.write_line()
+
+    for namespace in filter_by_node_kind(source, [CursorKind.NAMESPACE]):
+        enums = filter_by_node_kind(namespace.get_children(), [CursorKind.ENUM_DECL])
+        structs = filter_by_node_kind(namespace.get_children(), [CursorKind.STRUCT_DECL])
+
+        emum_xitems_map = compute_all_enums(enums)
+        struct_field_map = compute_all_structs(structs)
+        field_size_map = compute_all_fields_size(struct_field_map)
+    
+        with cpp.block(CXX_NAMESPACE.format(namespace.spelling)):
+            cpp.write(CXX_ENUM_SERIALIZE_TEMPLATE.render(enums=emum_xitems_map.items()))        
+            cpp.write(CXX_STRUCT_SERIALIZE_TEMPLATE.render(structs=struct_field_map.items(), field_size=field_size_map))
+            cpp.write_line();
+
+    cpp.save(output_file_name)
+
+def main():
+    parser = ArgumentParser("Generate source files")
+    parser.add_argument("--dir",
+                        required=True,
+                        help="Ouput directory")
+
+    parser.add_argument("--file",
+                        required=True,
+                        help="Path to file")
+
+    args = parser.parse_args()
+
+    direction = args.dir
+    path_to_file = args.file
+
+     
+    input_file_name = path_to_file
+    output_file_name = os.path.join(direction, f"{CXX_PREFIX_FILE}{os.path.splitext(os.path.basename(input_file_name))[0]}{CXX_SUFFIX_FILE}")
+
+    parse_file(input_file_name, output_file_name)
+
+if __name__ == "__main__":
+    main()

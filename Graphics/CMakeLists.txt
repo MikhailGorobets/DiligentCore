@@ -49,6 +49,7 @@ endif()
 
 
 if(PLATFORM_WIN32 OR PLATFORM_LINUX OR PLATFORM_MACOS)
+    add_subdirectory(ArchiveJSON)
     add_subdirectory(ArchiveBuilder)
 endif()
 
