@@ -30,8 +30,8 @@
 #include <array>
 #include <bitset>
 
-#include "ArchiveBuilder.h"
-#include "ArchiveBuilderFactory.h"
+#include "Archiver.h"
+#include "ArchiverFactory.h"
 #include "RenderDevice.h"
 
 #include "PipelineResourceSignatureBase.hpp"
@@ -46,7 +46,7 @@
 #include "MemoryFileStream.hpp"
 #include "PipelineStateBase.hpp"
 
-#include "DummyRenderDevice.hpp"
+#include "SerializationDeviceImpl.hpp"
 #include "SerializedMemory.hpp"
 #include "SerializableShaderImpl.hpp"
 #include "SerializableRenderPassImpl.hpp"
@@ -72,39 +72,39 @@
 namespace Diligent
 {
 
-class ArchiveBuilderImpl final : public ObjectBase<IArchiveBuilder>
+class ArchiverImpl final : public ObjectBase<IArchiver>
 {
 public:
-    using TBase = ObjectBase<IArchiveBuilder>;
+    using TBase = ObjectBase<IArchiver>;
 
-    ArchiveBuilderImpl(IReferenceCounters* pRefCounters, DummyRenderDevice* pDevice, IArchiveBuilderFactory* pFactory);
-    ~ArchiveBuilderImpl();
+    ArchiverImpl(IReferenceCounters* pRefCounters, SerializationDeviceImpl* pDevice);
+    ~ArchiverImpl();
 
-    IMPLEMENT_QUERY_INTERFACE_IN_PLACE(IID_ArchiveBuilder, TBase)
+    IMPLEMENT_QUERY_INTERFACE_IN_PLACE(IID_Archiver, TBase)
 
-    /// Implementation of IArchiveBuilder::SerializeToBlob().
+    /// Implementation of IArchiver::SerializeToBlob().
     virtual Bool DILIGENT_CALL_TYPE SerializeToBlob(IDataBlob** ppBlob) override final;
 
-    /// Implementation of IArchiveBuilder::SerializeToStream().
+    /// Implementation of IArchiver::SerializeToStream().
     virtual Bool DILIGENT_CALL_TYPE SerializeToStream(IFileStream* pStream) override final;
 
-    /// Implementation of IArchiveBuilder::ArchiveGraphicsPipelineState().
+    /// Implementation of IArchiver::ArchiveGraphicsPipelineState().
     virtual Bool DILIGENT_CALL_TYPE ArchiveGraphicsPipelineState(const GraphicsPipelineStateCreateInfo& PSOCreateInfo,
                                                                  const PipelineStateArchiveInfo&        ArchiveInfo) override final;
 
-    /// Implementation of IArchiveBuilder::ArchiveComputePipelineState().
+    /// Implementation of IArchiver::ArchiveComputePipelineState().
     virtual Bool DILIGENT_CALL_TYPE ArchiveComputePipelineState(const ComputePipelineStateCreateInfo& PSOCreateInfo,
                                                                 const PipelineStateArchiveInfo&       ArchiveInfo) override final;
 
-    /// Implementation of IArchiveBuilder::ArchiveRayTracingPipelineState().
+    /// Implementation of IArchiver::ArchiveRayTracingPipelineState().
     virtual Bool DILIGENT_CALL_TYPE ArchiveRayTracingPipelineState(const RayTracingPipelineStateCreateInfo& PSOCreateInfo,
                                                                    const PipelineStateArchiveInfo&          ArchiveInfo) override final;
 
-    /// Implementation of IArchiveBuilder::ArchiveTilePipelineState().
+    /// Implementation of IArchiver::ArchiveTilePipelineState().
     virtual Bool DILIGENT_CALL_TYPE ArchiveTilePipelineState(const TilePipelineStateCreateInfo& PSOCreateInfo,
                                                              const PipelineStateArchiveInfo&    ArchiveInfo) override final;
 
-    /// Implementation of IArchiveBuilder::ArchivePipelineResourceSignature().
+    /// Implementation of IArchiver::ArchivePipelineResourceSignature().
     virtual Bool DILIGENT_CALL_TYPE ArchivePipelineResourceSignature(const PipelineResourceSignatureDesc& SignatureDesc,
                                                                      const ResourceSignatureArchiveInfo&  ArchiveInfo) override final;
 
@@ -180,8 +180,7 @@ private:
     std::unordered_map<String, TilePSOData>       m_TilePSOMap;
     std::unordered_map<String, RayTracingPSOData> m_RayTracingPSOMap;
 
-    DummyRenderDevice*      m_pRenderDevice   = nullptr;
-    IArchiveBuilderFactory* m_pArchiveFactory = nullptr;
+    SerializationDeviceImpl* m_pSerializationDevice = nullptr;
 
 private:
     struct PendingData

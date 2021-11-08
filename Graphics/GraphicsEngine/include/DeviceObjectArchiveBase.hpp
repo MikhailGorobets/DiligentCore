@@ -42,7 +42,7 @@
 #include <array>
 #include <shared_mutex>
 
-#include "SerializationAPI.h"
+#include "Dearchiver.h"
 #include "DeviceObjectArchive.h"
 #include "PipelineResourceSignatureBase.hpp"
 #include "PipelineState.h"
@@ -88,7 +88,7 @@ protected:
     static constexpr Uint32 HeaderVersion     = 1;
     static constexpr Uint32 DataPtrAlign      = sizeof(Uint64);
 
-    friend class ArchiveBuilderImpl;
+    friend class ArchiverImpl;
 
     // Archive header contains offsets for blocks.
     // Any block can be added or removed without patching all offsets in archive,

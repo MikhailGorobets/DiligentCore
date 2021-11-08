@@ -40,7 +40,7 @@
 #include "VulkanUtilities/VulkanPhysicalDevice.hpp"
 #include "EngineFactoryBase.hpp"
 #include "VulkanTypeConversions.hpp"
-#include "SerializationAPIVkImpl.hpp"
+#include "DearchiverVkImpl.hpp"
 
 #if PLATFORM_ANDROID
 #    include "FileSystem.hpp"
@@ -111,9 +111,9 @@ public:
         m_EnableDeviceSimulation = true;
     }
 
-    virtual ISerializationAPI* DILIGENT_CALL_TYPE GetSerializationAPI() override final
+    virtual IDearchiver* DILIGENT_CALL_TYPE GetDearchiver() override final
     {
-        return &m_SerializationAPI;
+        return &m_Dearchiver;
     }
 
 #if PLATFORM_ANDROID
@@ -130,7 +130,7 @@ private:
 
     bool m_EnableDeviceSimulation = false;
 
-    SerializationAPIVkImpl m_SerializationAPI{nullptr}; // AZ TODO
+    DearchiverVkImpl m_Dearchiver{nullptr}; // AZ TODO
 };
 
 

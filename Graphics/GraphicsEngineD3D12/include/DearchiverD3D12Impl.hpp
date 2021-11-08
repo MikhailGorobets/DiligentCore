@@ -27,34 +27,34 @@
 #pragma once
 
 /// \file
-/// Implementation of the Diligent::SerializationAPID3D12Impl class
+/// Implementation of the Diligent::DearchiverD3D12Impl class
 
-#include "SerializationAPIBase.hpp"
+#include "DearchiverBase.hpp"
 
 namespace Diligent
 {
 
-/// Serialization API object implementation in Direct3D12 backend.
-class SerializationAPID3D12Impl : public SerializationAPIBase
+/// Dearchiver object implementation in Direct3D12 backend.
+class DearchiverD3D12Impl : public DearchiverBase
 {
 public:
-    using TSerializationAPIBase = SerializationAPIBase;
+    using TDearchiverBase = DearchiverBase;
 
-    explicit SerializationAPID3D12Impl(IReferenceCounters* pRefCounters);
+    explicit DearchiverD3D12Impl(IReferenceCounters* pRefCounters);
 
-    /// Implementation of ISerializationAPI::CreateDeviceObjectArchive() in Direct3D12 backend.
+    /// Implementation of IDearchiver::CreateDeviceObjectArchive() in Direct3D12 backend.
     virtual void DILIGENT_CALL_TYPE CreateDeviceObjectArchive(IArchive*              pSource,
                                                               IDeviceObjectArchive** ppArchive) override final;
 
-    /// Implementation of ISerializationAPI::UnpackPipelineState() in Direct3D12 backend.
+    /// Implementation of IDearchiver::UnpackPipelineState() in Direct3D12 backend.
     virtual void DILIGENT_CALL_TYPE UnpackPipelineState(const PipelineStateUnpackInfo& DeArchiveInfo,
                                                         IPipelineState**               ppPSO) override final;
 
-    /// Implementation of ISerializationAPI::UnpackResourceSignature() in Direct3D12 backend.
+    /// Implementation of IDearchiver::UnpackResourceSignature() in Direct3D12 backend.
     virtual void DILIGENT_CALL_TYPE UnpackResourceSignature(const ResourceSignatureUnpackInfo& DeArchiveInfo,
                                                             IPipelineResourceSignature**       ppSignature) override final;
 
-    /// Implementation of ISerializationAPI::UnpackRenderPass() in Direct3D12 backend.
+    /// Implementation of IDearchiver::UnpackRenderPass() in Direct3D12 backend.
     virtual void DILIGENT_CALL_TYPE UnpackRenderPass(const RenderPassUnpackInfo& DeArchiveInfo,
                                                      IRenderPass**               ppRP) override final;
 };

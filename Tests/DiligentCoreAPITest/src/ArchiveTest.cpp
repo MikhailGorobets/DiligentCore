@@ -30,7 +30,8 @@
 #include "TestingSwapChainBase.hpp"
 
 #include "GraphicsAccessories.hpp"
-#include "SerializationAPI.h"
+#include "ArchiveMemoryImpl.hpp"
+#include "Dearchiver.h"
 
 #include "ResourceLayoutTestCommon.hpp"
 #include "gtest/gtest.h"
@@ -135,12 +136,12 @@ bool operator==(const GraphicsPipelineDesc& Lhs, const GraphicsPipelineDesc& Rhs
 
 TEST(ArchiveTest, ResourceSignature)
 {
-    auto* pEnv            = TestingEnvironment::GetInstance();
-    auto* pDevice         = pEnv->GetDevice();
-    auto* pArchiveFactory = pEnv->GetArchiveFactory();
-    auto* pSerialization  = pDevice->GetEngineFactory()->GetSerializationAPI();
+    auto* pEnv             = TestingEnvironment::GetInstance();
+    auto* pDevice          = pEnv->GetDevice();
+    auto* pArchiverFactory = pEnv->GetArchiverFactory();
+    auto* pDearchiver      = pDevice->GetEngineFactory()->GetDearchiver();
 
-    if (!pSerialization || !pArchiveFactory)
+    if (!pDearchiver || !pArchiverFactory)
         return;
 
     constexpr char PRS1Name[] = "PRS archive test - 1";
@@ -152,8 +153,12 @@ TEST(ArchiveTest, ResourceSignature)
     RefCntAutoPtr<IPipelineResourceSignature> pRefPRS_2;
     RefCntAutoPtr<IDeviceObjectArchive>       pArchive;
     {
-        RefCntAutoPtr<IArchiveBuilder> pBuilder;
-        pArchiveFactory->CreateArchiveBuilder(&pBuilder);
+        RefCntAutoPtr<ISerializationDevice> pSerializationDevice;
+        pArchiverFactory->CreateSerializationDevice(&pSerializationDevice);
+        ASSERT_NE(pSerializationDevice, nullptr);
+
+        RefCntAutoPtr<IArchiver> pBuilder;
+        pArchiverFactory->CreateArchiver(pSerializationDevice, &pBuilder);
         ASSERT_NE(pBuilder, nullptr);
 
         // PRS 1
@@ -215,11 +220,8 @@ TEST(ArchiveTest, ResourceSignature)
         pBuilder->SerializeToBlob(&pBlob);
         ASSERT_NE(pBlob, nullptr);
 
-        RefCntAutoPtr<IArchive> pSource;
-        pSerialization->CreateArchiveSourceFromBlob(pBlob, &pSource);
-        ASSERT_NE(pSource, nullptr);
-
-        pSerialization->CreateDeviceObjectArchive(pSource, &pArchive);
+        RefCntAutoPtr<IArchive> pSource{MakeNewRCObj<ArchiveMemoryImpl>{}(pBlob)};
+        pDearchiver->CreateDeviceObjectArchive(pSource, &pArchive);
         ASSERT_NE(pArchive, nullptr);
     }
 
@@ -232,7 +234,7 @@ TEST(ArchiveTest, ResourceSignature)
         UnpackInfo.SRBAllocationGranularity = 10;
 
         RefCntAutoPtr<IPipelineResourceSignature> pUnpackedPRS;
-        pSerialization->UnpackResourceSignature(UnpackInfo, &pUnpackedPRS);
+        pDearchiver->UnpackResourceSignature(UnpackInfo, &pUnpackedPRS);
         ASSERT_NE(pUnpackedPRS, nullptr);
 
         ASSERT_TRUE(pUnpackedPRS->IsCompatibleWith(pRefPRS_1)); // AZ TODO: names are ignored
@@ -247,7 +249,7 @@ TEST(ArchiveTest, ResourceSignature)
         UnpackInfo.SRBAllocationGranularity = 10;
 
         RefCntAutoPtr<IPipelineResourceSignature> pUnpackedPRS;
-        pSerialization->UnpackResourceSignature(UnpackInfo, &pUnpackedPRS);
+        pDearchiver->UnpackResourceSignature(UnpackInfo, &pUnpackedPRS);
         ASSERT_NE(pUnpackedPRS, nullptr);
 
         ASSERT_TRUE(pUnpackedPRS->IsCompatibleWith(pRefPRS_2)); // AZ TODO: names are ignored
@@ -322,12 +324,12 @@ struct Constants
 
 TEST(ArchiveTest, GraphicsPipeline)
 {
-    auto* pEnv            = TestingEnvironment::GetInstance();
-    auto* pDevice         = pEnv->GetDevice();
-    auto* pArchiveFactory = pEnv->GetArchiveFactory();
-    auto* pSerialization  = pDevice->GetEngineFactory()->GetSerializationAPI();
+    auto* pEnv             = TestingEnvironment::GetInstance();
+    auto* pDevice          = pEnv->GetDevice();
+    auto* pArchiverFactory = pEnv->GetArchiverFactory();
+    auto* pDearchiver      = pDevice->GetEngineFactory()->GetDearchiver();
 
-    if (!pSerialization || !pArchiveFactory)
+    if (!pDearchiver || !pArchiverFactory)
         return;
 
     constexpr char PSO1Name[] = "PSO archive test - 1";
@@ -337,6 +339,10 @@ TEST(ArchiveTest, GraphicsPipeline)
     TestingEnvironment::ScopedReleaseResources AutoreleaseResources;
 
     auto* pSwapChain = pEnv->GetSwapChain();
+
+    RefCntAutoPtr<ISerializationDevice> pSerializationDevice;
+    pArchiverFactory->CreateSerializationDevice(&pSerializationDevice);
+    ASSERT_NE(pSerializationDevice, nullptr);
 
     RefCntAutoPtr<IRenderPass> pRenderPass1;
     RefCntAutoPtr<IRenderPass> pSerializedRenderPass1;
@@ -369,7 +375,7 @@ TEST(ArchiveTest, GraphicsPipeline)
         pDevice->CreateRenderPass(RPDesc, &pRenderPass1);
         ASSERT_NE(pRenderPass1, nullptr);
 
-        pArchiveFactory->CreateRenderPass(RPDesc, &pSerializedRenderPass1);
+        pSerializationDevice->CreateRenderPass(RPDesc, &pSerializedRenderPass1);
         ASSERT_NE(pSerializedRenderPass1, nullptr);
     }
 
@@ -417,7 +423,7 @@ TEST(ArchiveTest, GraphicsPipeline)
         pDevice->CreateRenderPass(RPDesc, &pRenderPass2);
         ASSERT_NE(pRenderPass2, nullptr);
 
-        pArchiveFactory->CreateRenderPass(RPDesc, &pSerializedRenderPass2);
+        pSerializationDevice->CreateRenderPass(RPDesc, &pSerializedRenderPass2);
         ASSERT_NE(pSerializedRenderPass2, nullptr);
     }
 
@@ -448,7 +454,7 @@ TEST(ArchiveTest, GraphicsPipeline)
         PRSDesc.ImmutableSamplers    = ImmutableSamplers;
         PRSDesc.NumImmutableSamplers = _countof(ImmutableSamplers);
 
-        pArchiveFactory->CreatePipelineResourceSignature(PRSDesc, GetDeviceBits(), &pSerializedPRS);
+        pSerializationDevice->CreatePipelineResourceSignature(PRSDesc, GetDeviceBits(), &pSerializedPRS);
         ASSERT_NE(pSerializedPRS, nullptr);
 
         pDevice->CreatePipelineResourceSignature(PRSDesc, &pRefPRS);
@@ -459,8 +465,8 @@ TEST(ArchiveTest, GraphicsPipeline)
     RefCntAutoPtr<IPipelineState>       pRefPSO_2;
     RefCntAutoPtr<IDeviceObjectArchive> pArchive;
     {
-        RefCntAutoPtr<IArchiveBuilder> pBuilder;
-        pArchiveFactory->CreateArchiveBuilder(&pBuilder);
+        RefCntAutoPtr<IArchiver> pBuilder;
+        pArchiverFactory->CreateArchiver(pSerializationDevice, &pBuilder);
         ASSERT_NE(pBuilder, nullptr);
 
         ShaderCreateInfo ShaderCI;
@@ -479,7 +485,7 @@ TEST(ArchiveTest, GraphicsPipeline)
             pDevice->CreateShader(ShaderCI, &pVS);
             ASSERT_NE(pVS, nullptr);
 
-            pArchiveFactory->CreateShader(ShaderCI, GetDeviceBits(), &pSerializedVS);
+            pSerializationDevice->CreateShader(ShaderCI, GetDeviceBits(), &pSerializedVS);
             ASSERT_NE(pSerializedVS, nullptr);
         }
 
@@ -494,7 +500,7 @@ TEST(ArchiveTest, GraphicsPipeline)
             pDevice->CreateShader(ShaderCI, &pPS);
             ASSERT_NE(pPS, nullptr);
 
-            pArchiveFactory->CreateShader(ShaderCI, GetDeviceBits(), &pSerializedPS);
+            pSerializationDevice->CreateShader(ShaderCI, GetDeviceBits(), &pSerializedPS);
             ASSERT_NE(pSerializedPS, nullptr);
         }
 
@@ -570,11 +576,8 @@ TEST(ArchiveTest, GraphicsPipeline)
         pBuilder->SerializeToBlob(&pBlob);
         ASSERT_NE(pBlob, nullptr);
 
-        RefCntAutoPtr<IArchive> pSource;
-        pSerialization->CreateArchiveSourceFromBlob(pBlob, &pSource);
-        ASSERT_NE(pSource, nullptr);
-
-        pSerialization->CreateDeviceObjectArchive(pSource, &pArchive);
+        RefCntAutoPtr<IArchive> pSource{MakeNewRCObj<ArchiveMemoryImpl>{}(pBlob)};
+        pDearchiver->CreateDeviceObjectArchive(pSource, &pArchive);
         ASSERT_NE(pArchive, nullptr);
     }
 
@@ -586,7 +589,7 @@ TEST(ArchiveTest, GraphicsPipeline)
         UnpackInfo.pArchive = pArchive;
         UnpackInfo.pDevice  = pDevice;
 
-        pSerialization->UnpackRenderPass(UnpackInfo, &pUnpackedRenderPass);
+        pDearchiver->UnpackRenderPass(UnpackInfo, &pUnpackedRenderPass);
         ASSERT_NE(pUnpackedRenderPass, nullptr);
 
         ASSERT_TRUE(pUnpackedRenderPass->GetDesc() == pRenderPass1->GetDesc());
@@ -601,7 +604,7 @@ TEST(ArchiveTest, GraphicsPipeline)
         UnpackInfo.pDevice      = pDevice;
         UnpackInfo.PipelineType = PIPELINE_TYPE_GRAPHICS;
 
-        pSerialization->UnpackPipelineState(UnpackInfo, &pUnpackedPSO_1);
+        pDearchiver->UnpackPipelineState(UnpackInfo, &pUnpackedPSO_1);
         ASSERT_NE(pUnpackedPSO_1, nullptr);
 
         ASSERT_TRUE(pUnpackedPSO_1->GetGraphicsPipelineDesc() == pRefPSO_1->GetGraphicsPipelineDesc());
@@ -616,7 +619,7 @@ TEST(ArchiveTest, GraphicsPipeline)
         UnpackInfo.pDevice      = pDevice;
         UnpackInfo.PipelineType = PIPELINE_TYPE_GRAPHICS;
 
-        pSerialization->UnpackPipelineState(UnpackInfo, &pUnpackedPSO_2);
+        pDearchiver->UnpackPipelineState(UnpackInfo, &pUnpackedPSO_2);
         ASSERT_NE(pUnpackedPSO_2, nullptr);
 
         ASSERT_TRUE(pUnpackedPSO_2->GetGraphicsPipelineDesc() == pRefPSO_2->GetGraphicsPipelineDesc());

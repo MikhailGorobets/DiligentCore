@@ -24,51 +24,14 @@
  *  of the possibility of such damages.
  */
 
-#include "SerializationAPIBase.hpp"
+#include "DearchiverBase.hpp"
 #include "ArchiveFileImpl.hpp"
 #include "ArchiveMemoryImpl.hpp"
 
 namespace Diligent
 {
 
-void SerializationAPIBase::CreateArchiveSourceFromFile(const Char* Path, IArchive** ppSource)
-{
-    DEV_CHECK_ERR(ppSource != nullptr, "ppSource must not be null");
-    if (!ppSource)
-        return;
-
-    *ppSource = nullptr;
-    try
-    {
-        auto pSourceImpl = ArchiveFileImpl::Create(Path);
-        pSourceImpl->QueryInterface(IID_Archive, reinterpret_cast<IObject**>(ppSource));
-    }
-    catch (...)
-    {
-        LOG_ERROR("Failed to create the archive source");
-    }
-}
-
-void SerializationAPIBase::CreateArchiveSourceFromBlob(IDataBlob* pBlob, IArchive** ppSource)
-{
-    DEV_CHECK_ERR(pBlob != nullptr, "pBlob must not be null");
-    DEV_CHECK_ERR(ppSource != nullptr, "ppSource must not be null");
-    if (!ppSource || !pBlob)
-        return;
-
-    *ppSource = nullptr;
-    try
-    {
-        auto pSourceImpl = ArchiveMemoryImpl::Create(pBlob);
-        pSourceImpl->QueryInterface(IID_Archive, reinterpret_cast<IObject**>(ppSource));
-    }
-    catch (...)
-    {
-        LOG_ERROR("Failed to create the archive source");
-    }
-}
-
-bool SerializationAPIBase::VerifyUnpackPipelineState(const PipelineStateUnpackInfo& DeArchiveInfo, IPipelineState** ppPSO)
+bool DearchiverBase::VerifyUnpackPipelineState(const PipelineStateUnpackInfo& DeArchiveInfo, IPipelineState** ppPSO)
 {
     DEV_CHECK_ERR(ppPSO != nullptr, "ppPSO must not be null");
     DEV_CHECK_ERR(DeArchiveInfo.pArchive != nullptr, "pArchive must not be null");
@@ -86,7 +49,7 @@ bool SerializationAPIBase::VerifyUnpackPipelineState(const PipelineStateUnpackIn
     return true;
 }
 
-bool SerializationAPIBase::VerifyUnpackResourceSignature(const ResourceSignatureUnpackInfo& DeArchiveInfo, IPipelineResourceSignature** ppSignature)
+bool DearchiverBase::VerifyUnpackResourceSignature(const ResourceSignatureUnpackInfo& DeArchiveInfo, IPipelineResourceSignature** ppSignature)
 {
     DEV_CHECK_ERR(ppSignature != nullptr, "ppSignature must not be null");
     DEV_CHECK_ERR(DeArchiveInfo.pArchive != nullptr, "pArchive must not be null");
@@ -102,7 +65,7 @@ bool SerializationAPIBase::VerifyUnpackResourceSignature(const ResourceSignature
     return true;
 }
 
-bool SerializationAPIBase::VerifyUnpackRenderPass(const RenderPassUnpackInfo& DeArchiveInfo, IRenderPass** ppRP)
+bool DearchiverBase::VerifyUnpackRenderPass(const RenderPassUnpackInfo& DeArchiveInfo, IRenderPass** ppRP)
 {
     DEV_CHECK_ERR(ppRP != nullptr, "ppRP must not be null");
     DEV_CHECK_ERR(DeArchiveInfo.pArchive != nullptr, "pArchive must not be null");

@@ -29,7 +29,7 @@
 #include "Shader.h"
 #include "ObjectBase.hpp"
 #include "STDAllocator.hpp"
-#include "DummyRenderDevice.hpp"
+#include "SerializationDeviceImpl.hpp"
 
 namespace Diligent
 {
@@ -46,10 +46,10 @@ class SerializableShaderImpl final : public ObjectBase<IShader>
 public:
     using TBase = ObjectBase<IShader>;
 
-    SerializableShaderImpl(IReferenceCounters*     pRefCounters,
-                           DummyRenderDevice*      pDevice,
-                           const ShaderCreateInfo& ShaderCI,
-                           Uint32                  DeviceBits);
+    SerializableShaderImpl(IReferenceCounters*      pRefCounters,
+                           SerializationDeviceImpl* pDevice,
+                           const ShaderCreateInfo&  ShaderCI,
+                           Uint32                   DeviceBits);
     ~SerializableShaderImpl();
 
     IMPLEMENT_QUERY_INTERFACE_IN_PLACE(IID_Shader, TBase)

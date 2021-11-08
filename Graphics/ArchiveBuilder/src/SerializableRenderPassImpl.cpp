@@ -33,10 +33,10 @@ namespace Diligent
 template <SerializerMode Mode>
 using SerializerImpl = DeviceObjectArchiveBase::SerializerImpl<Mode>;
 
-SerializableRenderPassImpl::SerializableRenderPassImpl(IReferenceCounters*   pRefCounters,
-                                                       DummyRenderDevice*    pDevice,
-                                                       const RenderPassDesc& Desc) :
-    TBase{pRefCounters, pDevice, Desc, true}
+SerializableRenderPassImpl::SerializableRenderPassImpl(IReferenceCounters*      pRefCounters,
+                                                       SerializationDeviceImpl* pDevice,
+                                                       const RenderPassDesc&    Desc) :
+    TBase{pRefCounters, pDevice->GetDevice(), Desc, true}
 {
     Serializer<SerializerMode::Measure> MeasureSer;
     SerializerImpl<SerializerMode::Measure>::SerializeRenderPass(MeasureSer, m_Desc, nullptr);

@@ -31,7 +31,7 @@
 #include "STDAllocator.hpp"
 #include "SerializedMemory.hpp"
 #include "DeviceObjectArchiveBase.hpp"
-#include "DummyRenderDevice.hpp"
+#include "SerializationDeviceImpl.hpp"
 
 namespace Diligent
 {
@@ -49,7 +49,7 @@ public:
     using TBase = ObjectBase<IPipelineResourceSignature>;
 
     SerializableResourceSignatureImpl(IReferenceCounters*                  pRefCounters,
-                                      DummyRenderDevice*                   pDevice,
+                                      SerializationDeviceImpl*             pDevice,
                                       const PipelineResourceSignatureDesc& Desc,
                                       Uint32                               DeviceBits);
     ~SerializableResourceSignatureImpl() override;

@@ -24,7 +24,7 @@
  *  of the possibility of such damages.
  */
 
-#include "ArchiveBuilderImpl.hpp"
+#include "ArchiverImpl.hpp"
 
 namespace Diligent
 {
@@ -76,14 +76,14 @@ void ValidatePipelineStateArchiveInfo(const PipelineStateCreateInfo&  PSOCreateI
 } // namespace
 
 
-const SerializedMemory& ArchiveBuilderImpl::RPData::GetSharedData() const
+const SerializedMemory& ArchiverImpl::RPData::GetSharedData() const
 {
     return pRP->GetSharedSerializedMemory();
 }
 
 #if VULKAN_SUPPORTED
 template <typename CreateInfoType>
-bool ArchiveBuilderImpl::PatchShadersVk(const CreateInfoType& CreateInfo, TShaderIndices& ShaderIndices)
+bool ArchiverImpl::PatchShadersVk(const CreateInfoType& CreateInfo, TShaderIndices& ShaderIndices)
 {
     struct ShaderStageInfoVk : PipelineStateVkImpl::ShaderStageInfo
     {
@@ -197,7 +197,7 @@ bool ArchiveBuilderImpl::PatchShadersVk(const CreateInfoType& CreateInfo, TShade
 
 #if D3D12_SUPPORTED
 template <typename CreateInfoType>
-bool ArchiveBuilderImpl::PatchShadersD3D12(const CreateInfoType& CreateInfo, TShaderIndices& ShaderIndices)
+bool ArchiverImpl::PatchShadersD3D12(const CreateInfoType& CreateInfo, TShaderIndices& ShaderIndices)
 {
     struct ShaderStageInfoD3D12 : PipelineStateD3D12Impl::ShaderStageInfo
     {
@@ -244,7 +244,7 @@ bool ArchiveBuilderImpl::PatchShadersD3D12(const CreateInfoType& CreateInfo, TSh
                                                      Signatures.data(),
                                                      CreateInfo.ResourceSignaturesCount,
                                                      RootSig,
-                                                     m_pRenderDevice->GetDxCompilerForDirect3D12());
+                                                     m_pSerializationDevice->GetDxCompilerForDirect3D12());
     }
     catch (...)
     {
@@ -290,7 +290,7 @@ bool ArchiveBuilderImpl::PatchShadersD3D12(const CreateInfoType& CreateInfo, TSh
 #endif // D3D12_SUPPORTED
 
 
-void ArchiveBuilderImpl::SerializeShadersForPSO(const TShaderIndices& ShaderIndices, SerializedMemory& DeviceData) const
+void ArchiverImpl::SerializeShadersForPSO(const TShaderIndices& ShaderIndices, SerializedMemory& DeviceData) const
 {
     auto& RawMemAllocator = GetRawAllocator();
 
@@ -309,7 +309,7 @@ void ArchiveBuilderImpl::SerializeShadersForPSO(const TShaderIndices& ShaderIndi
     DeviceData = SerializedMemory{SerPtr, SerSize};
 }
 
-bool ArchiveBuilderImpl::AddRenderPass(IRenderPass* pRP)
+bool ArchiverImpl::AddRenderPass(IRenderPass* pRP)
 {
     DEV_CHECK_ERR(pRP != nullptr, "pRP must not be null");
     if (pRP == nullptr)
@@ -371,14 +371,14 @@ void PSOSerializer(Serializer<Mode>&                                 Ser,
 } // namespace
 
 template <typename CreateInfoType>
-bool ArchiveBuilderImpl::SerializePSO(std::unordered_map<String, TPSOData<CreateInfoType>>& PSOMap,
-                                      const CreateInfoType&                                 PSOCreateInfo,
-                                      const PipelineStateArchiveInfo&                       ArchiveInfo) noexcept
+bool ArchiverImpl::SerializePSO(std::unordered_map<String, TPSOData<CreateInfoType>>& PSOMap,
+                                const CreateInfoType&                                 PSOCreateInfo,
+                                const PipelineStateArchiveInfo&                       ArchiveInfo) noexcept
 {
     try
     {
-        ValidatePipelineStateArchiveInfo(PSOCreateInfo, ArchiveInfo, m_PRSMap, m_pRenderDevice->GetValidDeviceBits());
-        ValidatePSOCreateInfo(m_pRenderDevice, PSOCreateInfo);
+        ValidatePipelineStateArchiveInfo(PSOCreateInfo, ArchiveInfo, m_PRSMap, m_pSerializationDevice->GetValidDeviceBits());
+        ValidatePSOCreateInfo(m_pSerializationDevice->GetDevice(), PSOCreateInfo);
     }
     catch (...)
     {
@@ -478,8 +478,8 @@ bool ArchiveBuilderImpl::SerializePSO(std::unordered_map<String, TPSOData<Create
     return true;
 }
 
-Bool ArchiveBuilderImpl::ArchiveGraphicsPipelineState(const GraphicsPipelineStateCreateInfo& PSOCreateInfo,
-                                                      const PipelineStateArchiveInfo&        ArchiveInfo)
+Bool ArchiverImpl::ArchiveGraphicsPipelineState(const GraphicsPipelineStateCreateInfo& PSOCreateInfo,
+                                                const PipelineStateArchiveInfo&        ArchiveInfo)
 {
     if (PSOCreateInfo.GraphicsPipeline.pRenderPass != nullptr)
     {
@@ -490,20 +490,20 @@ Bool ArchiveBuilderImpl::ArchiveGraphicsPipelineState(const GraphicsPipelineStat
     return SerializePSO(m_GraphicsPSOMap, PSOCreateInfo, ArchiveInfo);
 }
 
-Bool ArchiveBuilderImpl::ArchiveComputePipelineState(const ComputePipelineStateCreateInfo& PSOCreateInfo,
-                                                     const PipelineStateArchiveInfo&       ArchiveInfo)
+Bool ArchiverImpl::ArchiveComputePipelineState(const ComputePipelineStateCreateInfo& PSOCreateInfo,
+                                               const PipelineStateArchiveInfo&       ArchiveInfo)
 {
     return SerializePSO(m_ComputePSOMap, PSOCreateInfo, ArchiveInfo);
 }
 
-Bool ArchiveBuilderImpl::ArchiveRayTracingPipelineState(const RayTracingPipelineStateCreateInfo& PSOCreateInfo,
-                                                        const PipelineStateArchiveInfo&          ArchiveInfo)
+Bool ArchiverImpl::ArchiveRayTracingPipelineState(const RayTracingPipelineStateCreateInfo& PSOCreateInfo,
+                                                  const PipelineStateArchiveInfo&          ArchiveInfo)
 {
     return SerializePSO(m_RayTracingPSOMap, PSOCreateInfo, ArchiveInfo);
 }
 
-Bool ArchiveBuilderImpl::ArchiveTilePipelineState(const TilePipelineStateCreateInfo& PSOCreateInfo,
-                                                  const PipelineStateArchiveInfo&    ArchiveInfo)
+Bool ArchiverImpl::ArchiveTilePipelineState(const TilePipelineStateCreateInfo& PSOCreateInfo,
+                                            const PipelineStateArchiveInfo&    ArchiveInfo)
 {
     return SerializePSO(m_TilePSOMap, PSOCreateInfo, ArchiveInfo);
 }

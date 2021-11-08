@@ -26,7 +26,7 @@
 
 #pragma once
 
-#include "ArchiveBuilderFactory.h"
+#include "ArchiverFactory.h"
 
 #if PLATFORM_ANDROID || PLATFORM_LINUX || PLATFORM_MACOS || PLATFORM_IOS || PLATFORM_TVOS || (PLATFORM_WIN32 && !defined(_MSC_VER))
 // https://gcc.gnu.org/wiki/Visibility
@@ -39,24 +39,24 @@
 
 #if PLATFORM_WIN32 && defined(_MSC_VER)
 #    include "../../GraphicsEngine/interface/LoadEngineDll.h"
-#    define EXPLICITLY_LOAD_ARCHIVE_BUILDER_FACTORY_DLL 1
+#    define EXPLICITLY_LOAD_ARCHIVER_FACTORY_DLL 1
 #endif
 
 DILIGENT_BEGIN_NAMESPACE(Diligent)
 
-#if EXPLICITLY_LOAD_ARCHIVE_BUILDER_FACTORY_DLL
+#if EXPLICITLY_LOAD_ARCHIVER_FACTORY_DLL
 
-typedef struct IArchiveBuilderFactory* (*GetArchiveBuilderFactoryType)();
+typedef struct IArchiverFactory* (*GetArchiverFactoryType)();
 
-inline GetArchiveBuilderFactoryType DILIGENT_GLOBAL_FUNCTION(LoadArchiveBuilderFactory)()
+inline GetArchiverFactoryType DILIGENT_GLOBAL_FUNCTION(LoadArchiverFactory)()
 {
-    return (GetArchiveBuilderFactoryType)LoadEngineDll("ArchiveBuilder", "GetArchiveBuilderFactory");
+    return (GetArchiverFactoryType)LoadEngineDll("Archiver", "GetArchiverFactory");
 }
 
 #else
 
 API_QUALIFIER
-struct IArchiveBuilderFactory* DILIGENT_GLOBAL_FUNCTION(GetArchiveBuilderFactory)();
+struct IArchiverFactory* DILIGENT_GLOBAL_FUNCTION(GetArchiverFactory)();
 
 #endif
 

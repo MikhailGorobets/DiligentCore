@@ -29,7 +29,7 @@
 /// \file
 /// Declaration of Diligent::DeviceObjectArchiveD3D12Impl class
 
-#include "SerializationAPI.h"
+#include "Dearchiver.h"
 
 #include "EngineD3D12ImplTraits.hpp"
 #include "DeviceObjectArchiveBase.hpp"

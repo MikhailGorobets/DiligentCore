@@ -27,7 +27,7 @@ set(INCLUDE
     include/RenderPassBase.hpp
     include/ResourceMappingImpl.hpp
     include/SamplerBase.hpp
-    include/SerializationAPIBase.hpp
+    include/DearchiverBase.hpp
     include/ShaderBase.hpp
     include/ShaderResourceBindingBase.hpp
     include/ShaderResourceCacheCommon.hpp
@@ -69,7 +69,7 @@ set(INTERFACE
     interface/RenderPass.h
     interface/ResourceMapping.h
     interface/Sampler.h
-    interface/SerializationAPI.h
+    interface/Dearchiver.h
     interface/Shader.h
     interface/ShaderResourceBinding.h
     interface/ShaderResourceVariable.h
@@ -103,7 +103,7 @@ set(SOURCE
     src/RenderPassBase.cpp
     src/ShaderBindingTableBase.cpp
     src/SamplerBase.cpp
-    src/SerializationAPIBase.cpp
+    src/DearchiverBase.cpp
     src/TextureBase.cpp
     src/TopLevelASBase.cpp
 )

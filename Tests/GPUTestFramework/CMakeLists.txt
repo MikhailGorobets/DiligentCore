@@ -142,7 +142,7 @@ set_target_properties(Diligent-GPUTestFramework PROPERTIES
     FOLDER "DiligentCore/Tests"
 )
 
-if (TARGET Diligent-ArchiveBuilder-interface)
-    target_link_libraries(Diligent-GPUTestFramework PUBLIC Diligent-ArchiveBuilder-interface)
-    target_compile_definitions(Diligent-GPUTestFramework PUBLIC ARCHIVE_BUILDER_SUPPORTED=1)
+if (TARGET Diligent-Archiver-interface)
+    target_link_libraries(Diligent-GPUTestFramework PUBLIC Diligent-Archiver-interface)
+    target_compile_definitions(Diligent-GPUTestFramework PUBLIC ARCHIVER_SUPPORTED=1)
 endif()

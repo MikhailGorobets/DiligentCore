@@ -29,7 +29,7 @@
 /// \file
 /// Declaration of Diligent::DeviceObjectArchiveVkImpl class
 
-#include "SerializationAPI.h"
+#include "Dearchiver.h"
 
 #include "EngineVkImplTraits.hpp"
 #include "DeviceObjectArchiveBase.hpp"

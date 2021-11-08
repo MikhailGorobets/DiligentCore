@@ -24,17 +24,14 @@
  *  of the possibility of such damages.
  */
 
-#include "ArchiveBuilderFactory.h"
-#include "ArchiveBuilderFactoryLoader.h"
+#include "ArchiverFactory.h"
+#include "ArchiverFactoryLoader.h"
 
 // defined in Windows.h
 #undef GetObject
 
-#include "ArchiveBuilderImpl.hpp"
-#include "DummyRenderDevice.hpp"
-#include "SerializableShaderImpl.hpp"
-#include "SerializableRenderPassImpl.hpp"
-#include "SerializableResourceSignatureImpl.hpp"
+#include "ArchiverImpl.hpp"
+#include "SerializationDeviceImpl.hpp"
 #include "EngineMemory.h"
 
 namespace Diligent
@@ -42,16 +39,16 @@ namespace Diligent
 namespace
 {
 
-class ArchiveBuilderFactoryImpl final : public IArchiveBuilderFactory
+class ArchiverFactoryImpl final : public IArchiverFactory
 {
 public:
-    static ArchiveBuilderFactoryImpl* GetInstance()
+    static ArchiverFactoryImpl* GetInstance()
     {
-        static ArchiveBuilderFactoryImpl TheFactory;
+        static ArchiverFactoryImpl TheFactory;
         return &TheFactory;
     }
 
-    ArchiveBuilderFactoryImpl() :
+    ArchiverFactoryImpl() :
         m_RefCounters{*this}
     {}
 
@@ -61,7 +58,7 @@ public:
             return;
 
         *ppInterface = nullptr;
-        if (IID == IID_Unknown || IID == IID_ArchiveBuilderFactory)
+        if (IID == IID_Unknown || IID == IID_ArchiverFactory)
         {
             *ppInterface = this;
             (*ppInterface)->AddRef();
@@ -83,83 +80,46 @@ public:
         return const_cast<IReferenceCounters*>(static_cast<const IReferenceCounters*>(&m_RefCounters));
     }
 
-    virtual void DILIGENT_CALL_TYPE CreateArchiveBuilder(IArchiveBuilder** ppBuilder) override final
+    virtual void DILIGENT_CALL_TYPE CreateArchiver(ISerializationDevice* pDevice, IArchiver** ppArchiver) override final
     {
-        DEV_CHECK_ERR(ppBuilder != nullptr, "ppBuilder must not be null");
-        if (!ppBuilder)
+        DEV_CHECK_ERR(ppArchiver != nullptr, "ppArchiver must not be null");
+        if (!ppArchiver)
             return;
 
-        *ppBuilder = nullptr;
+        *ppArchiver = nullptr;
         try
         {
             auto& RawMemAllocator = GetRawAllocator();
-            auto* pBuilderImpl(NEW_RC_OBJ(RawMemAllocator, "Archive builder instance", ArchiveBuilderImpl)(&m_RenderDevice, this));
-            pBuilderImpl->QueryInterface(IID_ArchiveBuilder, reinterpret_cast<IObject**>(ppBuilder));
+            auto* pArchiverImpl(NEW_RC_OBJ(RawMemAllocator, "Archiver instance", ArchiverImpl)(ClassPtrCast<SerializationDeviceImpl>(pDevice)));
+            pArchiverImpl->QueryInterface(IID_Archiver, reinterpret_cast<IObject**>(ppArchiver));
         }
         catch (...)
         {
-            LOG_ERROR_MESSAGE("Failed to create the archive builder");
+            LOG_ERROR_MESSAGE("Failed to create the archiver");
         }
     }
 
-    virtual void DILIGENT_CALL_TYPE CreateShader(const ShaderCreateInfo& ShaderCI, Uint32 DeviceBits, IShader** ppShader) override final
+    virtual void DILIGENT_CALL_TYPE CreateSerializationDevice(ISerializationDevice** ppDevice) override final
     {
-        DEV_CHECK_ERR(ppShader != nullptr, "ppShader must not be null");
-        if (!ppShader)
+        DEV_CHECK_ERR(ppDevice != nullptr, "ppDevice must not be null");
+        if (!ppDevice)
             return;
 
-        *ppShader = nullptr;
+        *ppDevice = nullptr;
         try
         {
             auto& RawMemAllocator = GetRawAllocator();
-            auto* pShaderImpl(NEW_RC_OBJ(RawMemAllocator, "Shader instance", SerializableShaderImpl)(&m_RenderDevice, ShaderCI, DeviceBits));
-            pShaderImpl->QueryInterface(IID_Shader, reinterpret_cast<IObject**>(ppShader));
+            auto* pDeviceImpl(NEW_RC_OBJ(RawMemAllocator, "Serialization device instance", SerializationDeviceImpl)());
+            pDeviceImpl->QueryInterface(IID_SerializationDevice, reinterpret_cast<IObject**>(ppDevice));
         }
         catch (...)
         {
-            LOG_ERROR_MESSAGE("Failed to create the shader");
+            LOG_ERROR_MESSAGE("Failed to create the serialization device");
         }
     }
 
-    virtual void DILIGENT_CALL_TYPE CreateRenderPass(const RenderPassDesc& Desc,
-                                                     IRenderPass**         ppRenderPass) override final
+    virtual void DILIGENT_CALL_TYPE CreateDefaultShaderSourceStreamFactory(const Char* SearchDirectories, struct IShaderSourceInputStreamFactory** ppShaderSourceFactory) const override final
     {
-        DEV_CHECK_ERR(ppRenderPass != nullptr, "ppRenderPass must not be null");
-        if (!ppRenderPass)
-            return;
-
-        *ppRenderPass = nullptr;
-        try
-        {
-            auto& RawMemAllocator = GetRawAllocator();
-            auto* pRenderPassImpl(NEW_RC_OBJ(RawMemAllocator, "Render pass instance", SerializableRenderPassImpl)(&m_RenderDevice, Desc));
-            pRenderPassImpl->QueryInterface(IID_RenderPass, reinterpret_cast<IObject**>(ppRenderPass));
-        }
-        catch (...)
-        {
-            LOG_ERROR_MESSAGE("Failed to create the render pass");
-        }
-    }
-
-    virtual void DILIGENT_CALL_TYPE CreatePipelineResourceSignature(const PipelineResourceSignatureDesc& Desc,
-                                                                    Uint32                               DeviceBits,
-                                                                    IPipelineResourceSignature**         ppSignature) override final
-    {
-        DEV_CHECK_ERR(ppSignature != nullptr, "ppSignature must not be null");
-        if (!ppSignature)
-            return;
-
-        *ppSignature = nullptr;
-        try
-        {
-            auto& RawMemAllocator = GetRawAllocator();
-            auto* pSignatureImpl(NEW_RC_OBJ(RawMemAllocator, "Pipeline resource signature instance", SerializableResourceSignatureImpl)(&m_RenderDevice, Desc, DeviceBits));
-            pSignatureImpl->QueryInterface(IID_PipelineResourceSignature, reinterpret_cast<IObject**>(ppSignature));
-        }
-        catch (...)
-        {
-            LOG_ERROR_MESSAGE("Failed to create the resource signature");
-        }
     }
 
 private:
@@ -167,7 +127,7 @@ private:
     class DummyReferenceCounters final : public IReferenceCounters
     {
     public:
-        DummyReferenceCounters(ArchiveBuilderFactoryImpl& Factory) noexcept :
+        DummyReferenceCounters(ArchiverFactoryImpl& Factory) noexcept :
             m_Factory{Factory}
         {
             m_lNumStrongReferences = 0;
@@ -211,22 +171,21 @@ private:
         }
 
     private:
-        ArchiveBuilderFactoryImpl& m_Factory;
-        Atomics::AtomicLong        m_lNumStrongReferences;
-        Atomics::AtomicLong        m_lNumWeakReferences;
+        ArchiverFactoryImpl& m_Factory;
+        Atomics::AtomicLong  m_lNumStrongReferences;
+        Atomics::AtomicLong  m_lNumWeakReferences;
     };
 
     DummyReferenceCounters m_RefCounters;
-    DummyRenderDevice      m_RenderDevice;
 };
 
 } // namespace
 
 
 API_QUALIFIER
-IArchiveBuilderFactory* GetArchiveBuilderFactory()
+IArchiverFactory* GetArchiverFactory()
 {
-    return ArchiveBuilderFactoryImpl::GetInstance();
+    return ArchiverFactoryImpl::GetInstance();
 }
 
 } // namespace Diligent
@@ -234,8 +193,8 @@ IArchiveBuilderFactory* GetArchiveBuilderFactory()
 extern "C"
 {
     API_QUALIFIER
-    Diligent::IArchiveBuilderFactory* Diligent_GetArchiveBuilderFactory()
+    Diligent::IArchiverFactory* Diligent_GetArchiverFactory()
     {
-        return Diligent::GetArchiveBuilderFactory();
+        return Diligent::GetArchiverFactory();
     }
 }

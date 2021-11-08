@@ -24,64 +24,37 @@
  *  of the possibility of such damages.
  */
 
-#include "DummyRenderDevice.hpp"
-#include "GLSLangUtils.hpp"
+#pragma once
+
+/// \file
+/// Implementation of the Diligent::DearchiverBase class
+
+#include "Dearchiver.h"
+#include "ObjectBase.hpp"
 
 namespace Diligent
 {
-namespace
+
+/// Class implementing base functionality of the dearchiver
+class DearchiverBase : public ObjectBase<IDearchiver>
 {
-static constexpr Uint32 GetDeviceBits()
-{
-    Uint32 DeviceBits = 0;
-#if D3D11_SUPPORTED
-    DeviceBits |= 1 << RENDER_DEVICE_TYPE_D3D11;
-#endif
-#if D3D12_SUPPORTED
-    DeviceBits |= 1 << RENDER_DEVICE_TYPE_D3D12;
-#endif
-#if GL_SUPPORTED
-    DeviceBits |= 1 << RENDER_DEVICE_TYPE_GL;
-#endif
-#if GLES_SUPPORTED
-    DeviceBits |= 1 << RENDER_DEVICE_TYPE_GLES;
-#endif
-#if VULKAN_SUPPORTED
-    DeviceBits |= 1 << RENDER_DEVICE_TYPE_VULKAN;
-#endif
-#if METAL_SUPPORTED
-    DeviceBits |= 1 << RENDER_DEVICE_TYPE_METAL;
-#endif
-    return DeviceBits;
-}
+public:
+    // Base interface that this class inherits.
+    using BaseInterface = IDearchiver;
 
-static constexpr Uint32 ValidDeviceBits = GetDeviceBits();
-} // namespace
+    using TObjectBase = ObjectBase<BaseInterface>;
 
+    explicit DearchiverBase(IReferenceCounters* pRefCounters) :
+        TObjectBase{pRefCounters}
+    {
+    }
 
-DummyRenderDevice::DummyRenderDevice() :
-    TBase{nullptr},
-    m_pDxCompiler{CreateDXCompiler(DXCompilerTarget::Direct3D12, 0, nullptr)},
-    m_pVkDxCompiler{CreateDXCompiler(DXCompilerTarget::Vulkan, GetVkVersion(), nullptr)}
-{
-    m_DeviceInfo.Features  = DeviceFeatures{DEVICE_FEATURE_STATE_ENABLED};
-    m_AdapterInfo.Features = DeviceFeatures{DEVICE_FEATURE_STATE_ENABLED};
+    IMPLEMENT_QUERY_INTERFACE_IN_PLACE(IID_Dearchiver, TObjectBase)
 
-#if !DILIGENT_NO_GLSLANG
-    GLSLangUtils::InitializeGlslang();
-#endif
-}
-
-DummyRenderDevice::~DummyRenderDevice()
-{
-#if !DILIGENT_NO_GLSLANG
-    GLSLangUtils::FinalizeGlslang();
-#endif
-}
-
-Uint32 DummyRenderDevice::GetValidDeviceBits()
-{
-    return ValidDeviceBits;
-}
+protected:
+    bool VerifyUnpackPipelineState(const PipelineStateUnpackInfo& DeArchiveInfo, IPipelineState** ppPSO);
+    bool VerifyUnpackResourceSignature(const ResourceSignatureUnpackInfo& DeArchiveInfo, IPipelineResourceSignature** ppSignature);
+    bool VerifyUnpackRenderPass(const RenderPassUnpackInfo& DeArchiveInfo, IRenderPass** ppRP);
+};
 
 } // namespace Diligent

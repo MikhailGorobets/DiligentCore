@@ -26,19 +26,19 @@
 
 #include "pch.h"
 #include "RenderDeviceD3D12Impl.hpp"
-#include "SerializationAPID3D12Impl.hpp"
+#include "DearchiverD3D12Impl.hpp"
 #include "DeviceObjectArchiveD3D12Impl.hpp"
 
 namespace Diligent
 {
 
-SerializationAPID3D12Impl::SerializationAPID3D12Impl(IReferenceCounters* pRefCounters) :
-    TSerializationAPIBase{pRefCounters}
+DearchiverD3D12Impl::DearchiverD3D12Impl(IReferenceCounters* pRefCounters) :
+    TDearchiverBase{pRefCounters}
 {
 }
 
-void SerializationAPID3D12Impl::CreateDeviceObjectArchive(IArchive*              pSource,
-                                                          IDeviceObjectArchive** ppArchive)
+void DearchiverD3D12Impl::CreateDeviceObjectArchive(IArchive*              pSource,
+                                                    IDeviceObjectArchive** ppArchive)
 {
     DEV_CHECK_ERR(ppArchive != nullptr, "ppArchive must not be null");
     if (!ppArchive)
@@ -57,7 +57,7 @@ void SerializationAPID3D12Impl::CreateDeviceObjectArchive(IArchive*             
     }
 }
 
-void SerializationAPID3D12Impl::UnpackPipelineState(const PipelineStateUnpackInfo& DeArchiveInfo, IPipelineState** ppPSO)
+void DearchiverD3D12Impl::UnpackPipelineState(const PipelineStateUnpackInfo& DeArchiveInfo, IPipelineState** ppPSO)
 {
     if (!VerifyUnpackPipelineState(DeArchiveInfo, ppPSO))
         return;
@@ -85,7 +85,7 @@ void SerializationAPID3D12Impl::UnpackPipelineState(const PipelineStateUnpackInf
     }
 }
 
-void SerializationAPID3D12Impl::UnpackResourceSignature(const ResourceSignatureUnpackInfo& DeArchiveInfo, IPipelineResourceSignature** ppSignature)
+void DearchiverD3D12Impl::UnpackResourceSignature(const ResourceSignatureUnpackInfo& DeArchiveInfo, IPipelineResourceSignature** ppSignature)
 {
     if (!VerifyUnpackResourceSignature(DeArchiveInfo, ppSignature))
         return;
@@ -96,7 +96,7 @@ void SerializationAPID3D12Impl::UnpackResourceSignature(const ResourceSignatureU
     pArchiveD3D12->UnpackResourceSignature(DeArchiveInfo, *ppSignature);
 }
 
-void SerializationAPID3D12Impl::UnpackRenderPass(const RenderPassUnpackInfo& DeArchiveInfo, IRenderPass** ppRP)
+void DearchiverD3D12Impl::UnpackRenderPass(const RenderPassUnpackInfo& DeArchiveInfo, IRenderPass** ppRP)
 {
     if (!VerifyUnpackRenderPass(DeArchiveInfo, ppRP))
         return;

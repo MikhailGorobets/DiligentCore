@@ -27,34 +27,34 @@
 #pragma once
 
 /// \file
-/// Implementation of the Diligent::SerializationAPIVkImpl class
+/// Implementation of the Diligent::DearchiverVkImpl class
 
-#include "SerializationAPIBase.hpp"
+#include "DearchiverBase.hpp"
 
 namespace Diligent
 {
 
-/// Serialization API object implementation in Vulkan backend.
-class SerializationAPIVkImpl : public SerializationAPIBase
+/// Dearchiver object implementation in Vulkan backend.
+class DearchiverVkImpl : public DearchiverBase
 {
 public:
-    using TSerializationAPIBase = SerializationAPIBase;
+    using TDearchiverBase = DearchiverBase;
 
-    explicit SerializationAPIVkImpl(IReferenceCounters* pRefCounters);
+    explicit DearchiverVkImpl(IReferenceCounters* pRefCounters);
 
-    /// Implementation of ISerializationAPI::CreateDeviceObjectArchive() in Vulkan backend.
+    /// Implementation of IDearchiver::CreateDeviceObjectArchive() in Vulkan backend.
     virtual void DILIGENT_CALL_TYPE CreateDeviceObjectArchive(IArchive*              pSource,
                                                               IDeviceObjectArchive** ppArchive) override final;
 
-    /// Implementation of ISerializationAPI::UnpackPipelineState() in Vulkan backend.
+    /// Implementation of IDearchiver::UnpackPipelineState() in Vulkan backend.
     virtual void DILIGENT_CALL_TYPE UnpackPipelineState(const PipelineStateUnpackInfo& DeArchiveInfo,
                                                         IPipelineState**               ppPSO) override final;
 
-    /// Implementation of ISerializationAPI::UnpackResourceSignature() in Vulkan backend.
+    /// Implementation of IDearchiver::UnpackResourceSignature() in Vulkan backend.
     virtual void DILIGENT_CALL_TYPE UnpackResourceSignature(const ResourceSignatureUnpackInfo& DeArchiveInfo,
                                                             IPipelineResourceSignature**       ppSignature) override final;
 
-    /// Implementation of ISerializationAPI::UnpackRenderPass() in Vulkan backend.
+    /// Implementation of IDearchiver::UnpackRenderPass() in Vulkan backend.
     virtual void DILIGENT_CALL_TYPE UnpackRenderPass(const RenderPassUnpackInfo& DeArchiveInfo,
                                                      IRenderPass**               ppRP) override final;
 };

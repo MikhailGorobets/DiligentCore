@@ -55,8 +55,8 @@
 #    include "EngineFactoryMtl.h"
 #endif
 
-#if ARCHIVE_BUILDER_SUPPORTED
-#    include "ArchiveBuilderFactoryLoader.h"
+#if ARCHIVER_SUPPORTED
+#    include "ArchiverFactoryLoader.h"
 #endif
 
 
@@ -566,17 +566,17 @@ TestingEnvironment::TestingEnvironment(const CreateInfo& CI, const SwapChainDesc
     AdapterInfoStr += " MB.";
     LOG_INFO_MESSAGE(AdapterInfoStr);
 
-#if ARCHIVE_BUILDER_SUPPORTED
-    // Create archive builder factory
+#if ARCHIVER_SUPPORTED
+    // Create archiver factory
     {
-#    if EXPLICITLY_LOAD_ARCHIVE_BUILDER_FACTORY_DLL
-        auto GetArchiveBuilderFactory = LoadArchiveBuilderFactory();
-        if (GetArchiveBuilderFactory != nullptr)
+#    if EXPLICITLY_LOAD_ARCHIVER_FACTORY_DLL
+        auto GetArchiverFactory = LoadArchiverFactory();
+        if (GetArchiverFactory != nullptr)
         {
-            m_ArchiveBuilderFactory = GetArchiveBuilderFactory();
+            m_ArchiverFactory = GetArchiverFactory();
         }
 #    else
-        m_ArchiveBuilderFactory = GetArchiveBuilderFactory();
+        m_ArchiverFactory = GetArchiverFactory();
 #    endif
     }
 #endif

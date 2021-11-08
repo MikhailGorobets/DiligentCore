@@ -27,6 +27,7 @@
 #pragma once
 
 #include "RenderDevice.h"
+#include "SerializationDevice.h"
 #include "ObjectBase.hpp"
 #include "DXCompiler.hpp"
 
@@ -57,7 +58,7 @@ class DummyRenderDevice final : public ObjectBase<IRenderDevice>
 public:
     using TBase = ObjectBase<IRenderDevice>;
 
-    DummyRenderDevice();
+    explicit DummyRenderDevice(IReferenceCounters* pRefCounters);
     ~DummyRenderDevice();
 
     IMPLEMENT_QUERY_INTERFACE_IN_PLACE(IID_RenderDevice, TBase)
@@ -169,6 +170,34 @@ public:
     /// Implementation of IRenderDevice::GetEngineFactory().
     virtual IEngineFactory* DILIGENT_CALL_TYPE GetEngineFactory() const override final { return nullptr; }
 
+private:
+    RenderDeviceInfo    m_DeviceInfo;
+    GraphicsAdapterInfo m_AdapterInfo;
+};
+
+
+
+class SerializationDeviceImpl final : public ObjectBase<ISerializationDevice>
+{
+public:
+    using TBase = ObjectBase<ISerializationDevice>;
+
+    explicit SerializationDeviceImpl(IReferenceCounters* pRefCounters);
+    ~SerializationDeviceImpl();
+
+    IMPLEMENT_QUERY_INTERFACE_IN_PLACE(IID_SerializationDevice, TBase)
+
+    virtual void DILIGENT_CALL_TYPE CreateShader(const ShaderCreateInfo& ShaderCI,
+                                                 Uint32                  DeviceBits,
+                                                 IShader**               ppShader) override final;
+
+    virtual void DILIGENT_CALL_TYPE CreateRenderPass(const RenderPassDesc& Desc,
+                                                     IRenderPass**         ppRenderPass) override final;
+
+    virtual void DILIGENT_CALL_TYPE CreatePipelineResourceSignature(const PipelineResourceSignatureDesc& Desc,
+                                                                    Uint32                               DeviceBits,
+                                                                    IPipelineResourceSignature**         ppSignature) override final;
+
 #if D3D12_SUPPORTED
     IDXCompiler* GetDxCompilerForDirect3D12() const
     {
@@ -193,10 +222,10 @@ public:
 
     static Uint32 GetValidDeviceBits();
 
-private:
-    RenderDeviceInfo    m_DeviceInfo;
-    GraphicsAdapterInfo m_AdapterInfo;
+    DummyRenderDevice* GetDevice() { return &m_Device; }
 
+private:
+    DummyRenderDevice            m_Device;
     std::unique_ptr<IDXCompiler> m_pDxCompiler;
     std::unique_ptr<IDXCompiler> m_pVkDxCompiler;
 };

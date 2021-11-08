@@ -24,19 +24,19 @@
  *  of the possibility of such damages.
  */
 
-#include "ArchiveBuilderImpl.hpp"
+#include "ArchiverImpl.hpp"
 
 namespace Diligent
 {
 
 
-bool ArchiveBuilderImpl::ShaderKey::operator==(const ShaderKey& Rhs) const
+bool ArchiverImpl::ShaderKey::operator==(const ShaderKey& Rhs) const
 {
     return Data.Size == Rhs.Data.Size &&
         std::memcmp(Data.Ptr, Rhs.Data.Ptr, Data.Size) == 0;
 }
 
-size_t ArchiveBuilderImpl::ShaderKeyHash::operator()(const ShaderKey& Key) const
+size_t ArchiverImpl::ShaderKeyHash::operator()(const ShaderKey& Key) const
 {
     size_t Hash = 0;
     HashCombine(Hash, Key.Data.Size);
@@ -61,21 +61,20 @@ size_t ArchiveBuilderImpl::ShaderKeyHash::operator()(const ShaderKey& Key) const
 }
 
 
-ArchiveBuilderImpl::ArchiveBuilderImpl(IReferenceCounters* pRefCounters, DummyRenderDevice* pDevice, IArchiveBuilderFactory* pFactory) :
+ArchiverImpl::ArchiverImpl(IReferenceCounters* pRefCounters, SerializationDeviceImpl* pDevice) :
     TBase{pRefCounters},
-    m_pRenderDevice{pDevice},
-    m_pArchiveFactory{pFactory}
+    m_pSerializationDevice{pDevice}
 {}
 
-ArchiveBuilderImpl::~ArchiveBuilderImpl()
+ArchiverImpl::~ArchiverImpl()
 {
 }
 
 template <typename DataType>
-void ArchiveBuilderImpl::InitNamedResourceArrayHeader(std::vector<Uint8>&                         ChunkData,
-                                                      const std::unordered_map<String, DataType>& Map,
-                                                      Uint32*&                                    DataSizeArray,
-                                                      Uint32*&                                    DataOffsetArray)
+void ArchiverImpl::InitNamedResourceArrayHeader(std::vector<Uint8>&                         ChunkData,
+                                                const std::unordered_map<String, DataType>& Map,
+                                                Uint32*&                                    DataSizeArray,
+                                                Uint32*&                                    DataOffsetArray)
 {
     VERIFY_EXPR(!Map.empty());
 
@@ -127,7 +126,7 @@ void ArchiveBuilderImpl::InitNamedResourceArrayHeader(std::vector<Uint8>&       
     VERIFY_EXPR(static_cast<void*>(NameDataPtr) == ChunkData.data() + ChunkData.size());
 }
 
-Bool ArchiveBuilderImpl::SerializeToBlob(IDataBlob** ppBlob)
+Bool ArchiverImpl::SerializeToBlob(IDataBlob** ppBlob)
 {
     DEV_CHECK_ERR(ppBlob != nullptr, "ppBlob must not be null");
     if (ppBlob == nullptr)
@@ -135,8 +134,8 @@ Bool ArchiveBuilderImpl::SerializeToBlob(IDataBlob** ppBlob)
 
     *ppBlob = nullptr;
 
-    RefCntAutoPtr<DataBlobImpl>     pDataBlob(MakeNewRCObj<DataBlobImpl>()(0));
-    RefCntAutoPtr<MemoryFileStream> pMemStream(MakeNewRCObj<MemoryFileStream>()(pDataBlob));
+    RefCntAutoPtr<DataBlobImpl>     pDataBlob{MakeNewRCObj<DataBlobImpl>{}(0)};
+    RefCntAutoPtr<MemoryFileStream> pMemStream{MakeNewRCObj<MemoryFileStream>{}(pDataBlob)};
 
     if (!SerializeToStream(pMemStream))
         return false;
@@ -145,7 +144,7 @@ Bool ArchiveBuilderImpl::SerializeToBlob(IDataBlob** ppBlob)
     return true;
 }
 
-void ArchiveBuilderImpl::ReserveSpace(size_t& SharedDataSize, std::array<size_t, DeviceDataCount>& PerDeviceDataSize) const
+void ArchiverImpl::ReserveSpace(size_t& SharedDataSize, std::array<size_t, DeviceDataCount>& PerDeviceDataSize) const
 {
     // Reserve space for pipeline resource signatures
     for (auto& PRS : m_PRSMap)
@@ -203,7 +202,7 @@ void ArchiveBuilderImpl::ReserveSpace(size_t& SharedDataSize, std::array<size_t,
     static_assert(Uint32{ChunkType::Count} == 8, "Reserve space for new chunk type");
 }
 
-void ArchiveBuilderImpl::WriteResourceSignatureData(PendingData& Pending) const
+void ArchiverImpl::WriteResourceSignatureData(PendingData& Pending) const
 {
     if (m_PRSMap.empty())
         return;
@@ -262,7 +261,7 @@ void ArchiveBuilderImpl::WriteResourceSignatureData(PendingData& Pending) const
     }
 }
 
-void ArchiveBuilderImpl::WriteRenderPassData(PendingData& Pending) const
+void ArchiverImpl::WriteRenderPassData(PendingData& Pending) const
 {
     if (m_RPMap.empty())
         return;
@@ -302,7 +301,7 @@ void ArchiveBuilderImpl::WriteRenderPassData(PendingData& Pending) const
     }
 }
 
-void ArchiveBuilderImpl::WriteGraphicsPSOData(PendingData& Pending) const
+void ArchiverImpl::WriteGraphicsPSOData(PendingData& Pending) const
 {
     if (m_GraphicsPSOMap.empty())
         return;
@@ -361,7 +360,7 @@ void ArchiveBuilderImpl::WriteGraphicsPSOData(PendingData& Pending) const
     }
 }
 
-void ArchiveBuilderImpl::WriteShaderData(PendingData& Pending) const
+void ArchiverImpl::WriteShaderData(PendingData& Pending) const
 {
     {
         bool HasShaders = false;
@@ -432,7 +431,7 @@ void ArchiveBuilderImpl::WriteShaderData(PendingData& Pending) const
     }
 }
 
-void ArchiveBuilderImpl::UpdateOffsetsInArchive(PendingData& Pending) const
+void ArchiverImpl::UpdateOffsetsInArchive(PendingData& Pending) const
 {
     auto& ChunkData    = Pending.ChunkData;
     auto& HeaderData   = Pending.HeaderData;
@@ -505,7 +504,7 @@ void ArchiveBuilderImpl::UpdateOffsetsInArchive(PendingData& Pending) const
     }
 }
 
-void ArchiveBuilderImpl::WritePendingDataToStream(const PendingData& Pending, IFileStream* pStream) const
+void ArchiverImpl::WritePendingDataToStream(const PendingData& Pending, IFileStream* pStream) const
 {
     const size_t InitialSize = pStream->GetSize();
     pStream->Write(Pending.HeaderData.data(), Pending.HeaderData.size());
@@ -531,7 +530,7 @@ void ArchiveBuilderImpl::WritePendingDataToStream(const PendingData& Pending, IF
     VERIFY_EXPR(InitialSize + pStream->GetSize() == Pending.OffsetInFile);
 }
 
-Bool ArchiveBuilderImpl::SerializeToStream(IFileStream* pStream)
+Bool ArchiverImpl::SerializeToStream(IFileStream* pStream)
 {
     DEV_CHECK_ERR(pStream != nullptr, "pStream must not be null");
     if (pStream == nullptr)

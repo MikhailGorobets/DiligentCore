@@ -37,7 +37,7 @@
 #include "SwapChain.h"
 #include "GraphicsTypesOutputInserters.hpp"
 #include "NativeWindow.h"
-#include "ArchiveBuilderFactory.h"
+#include "ArchiverFactory.h"
 
 #include "gtest/gtest.h"
 
@@ -108,7 +108,7 @@ public:
         }
     };
 
-    IArchiveBuilderFactory* GetArchiveFactory() { return m_ArchiveBuilderFactory; }
+    IArchiverFactory* GetArchiverFactory() { return m_ArchiverFactory; }
 
     IRenderDevice*  GetDevice() { return m_pDevice; }
     IDeviceContext* GetDeviceContext(size_t ctx = 0)
@@ -186,7 +186,7 @@ protected:
     // A workaround is to use SM5.0 and default shader compiler.
     bool m_NeedWARPResourceArrayIndexingBugWorkaround = false;
 
-    RefCntAutoPtr<IArchiveBuilderFactory> m_ArchiveBuilderFactory;
+    RefCntAutoPtr<IArchiverFactory> m_ArchiverFactory;
 };
 
 } // namespace Testing

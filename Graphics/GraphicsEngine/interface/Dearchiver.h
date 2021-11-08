@@ -29,7 +29,7 @@
 // clang-format off
 
 /// \file
-/// Definition of the Diligent::ISerializationAPI interface and related data structures
+/// Definition of the Diligent::IDearchiver interface and related data structures
 
 #include "../../../Primitives/interface/DataBlob.h"
 #include "PipelineResourceSignature.h"
@@ -167,32 +167,22 @@ typedef struct RenderPassUnpackInfo RenderPassUnpackInfo;
 
 
 // {ACB3F67A-CE3B-4212-9592-879122D3C191}
-static const INTERFACE_ID IID_SerializationAPI =
+static const INTERFACE_ID IID_Dearchiver =
     {0xacb3f67a, 0xce3b, 0x4212, {0x95, 0x92, 0x87, 0x91, 0x22, 0xd3, 0xc1, 0x91}};
 
-#define DILIGENT_INTERFACE_NAME ISerializationAPI
+#define DILIGENT_INTERFACE_NAME IDearchiver
 #include "../../../Primitives/interface/DefineInterfaceHelperMacros.h"
 
-#define ISerializationAPIInclusiveMethods \
-    IDeviceObjectInclusiveMethods;        \
-    ISerializationAPIMethods SerializationAPI
+#define IDearchiverInclusiveMethods \
+    IDeviceObjectInclusiveMethods;  \
+    IDearchiverMethods Dearchiver
 
 // clang-format off
 
 
-/// Serialization API interface
-DILIGENT_BEGIN_INTERFACE(ISerializationAPI, IObject)
+/// Dearchiver interface
+DILIGENT_BEGIN_INTERFACE(IDearchiver, IObject)
 {
-    // AZ TODO
-    VIRTUAL void METHOD(CreateArchiveSourceFromFile)(THIS_
-                                                     const Char* Path,
-                                                     IArchive**  ppSource) PURE;
-    
-    // AZ TODO
-    VIRTUAL void METHOD(CreateArchiveSourceFromBlob)(THIS_
-                                                     IDataBlob* pBlob,
-                                                     IArchive** ppSource) PURE;
-
     // AZ TODO
     VIRTUAL void METHOD(CreateDeviceObjectArchive)(THIS_
                                                    IArchive*              pSource,
@@ -219,12 +209,10 @@ DILIGENT_END_INTERFACE
 
 #if DILIGENT_C_INTERFACE
 
-#    define ISerializationAPI_CreateDeviceObjectArchive(This, ...)    CALL_IFACE_METHOD(SerializationAPI, CreateDeviceObjectArchive,   This, __VA_ARGS__)
-#    define ISerializationAPI_CreateArchiveSourceFromFile(This, ...)  CALL_IFACE_METHOD(SerializationAPI, CreateArchiveSourceFromFile, This, __VA_ARGS__)
-#    define ISerializationAPI_CreateArchiveSourceFromBlob(This, ...)  CALL_IFACE_METHOD(SerializationAPI, CreateArchiveSourceFromBlob, This, __VA_ARGS__)
-#    define ISerializationAPI_UnpackPipelineState(This, ...)          CALL_IFACE_METHOD(SerializationAPI, UnpackPipelineState,         This, __VA_ARGS__)
-#    define ISerializationAPI_UnpackResourceSignature(This, ...)      CALL_IFACE_METHOD(SerializationAPI, UnpackResourceSignature,     This, __VA_ARGS__)
-#    define ISerializationAPI_UnpackRenderPass(This, ...)             CALL_IFACE_METHOD(SerializationAPI, UnpackRenderPass,            This, __VA_ARGS__)
+#    define IDearchiver_CreateDeviceObjectArchive(This, ...)    CALL_IFACE_METHOD(Dearchiver, CreateDeviceObjectArchive,   This, __VA_ARGS__)
+#    define IDearchiver_UnpackPipelineState(This, ...)          CALL_IFACE_METHOD(Dearchiver, UnpackPipelineState,         This, __VA_ARGS__)
+#    define IDearchiver_UnpackResourceSignature(This, ...)      CALL_IFACE_METHOD(Dearchiver, UnpackResourceSignature,     This, __VA_ARGS__)
+#    define IDearchiver_UnpackRenderPass(This, ...)             CALL_IFACE_METHOD(Dearchiver, UnpackRenderPass,            This, __VA_ARGS__)
 
 #endif
 

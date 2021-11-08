@@ -27,9 +27,9 @@
 #pragma once
 
 /// \file
-/// Defines Diligent::IArchiveBuilder interface
+/// Defines Diligent::IArchiver interface
 
-#include "SerializationAPI.h"
+#include "Dearchiver.h"
 #include "PipelineResourceSignature.h"
 #include "PipelineState.h"
 #include "DeviceObjectArchive.h"
@@ -37,15 +37,15 @@
 DILIGENT_BEGIN_NAMESPACE(Diligent)
 
 // {D8EBEC99-5A44-41A3-968F-1D7127ABEC79}
-static const INTERFACE_ID IID_ArchiveBuilder =
+static const INTERFACE_ID IID_Archiver =
     {0xd8ebec99, 0x5a44, 0x41a3, {0x96, 0x8f, 0x1d, 0x71, 0x27, 0xab, 0xec, 0x79}};
 
-#define DILIGENT_INTERFACE_NAME IArchiveBuilder
+#define DILIGENT_INTERFACE_NAME IArchiver
 #include "../../../Primitives/interface/DefineInterfaceHelperMacros.h"
 
-#define IArchiveBuilderInclusiveMethods \
-    IObjectInclusiveMethods;            \
-    IArchiveBuilderMethods ArchiveBuilder
+#define IArchiverInclusiveMethods \
+    IObjectInclusiveMethods;      \
+    IArchiverMethods Archiver
 
 // clang-format off
 
@@ -69,7 +69,7 @@ typedef struct ResourceSignatureArchiveInfo ResourceSignatureArchiveInfo;
 
 
 // AZ TODO
-DILIGENT_BEGIN_INTERFACE(IArchiveBuilder, IObject)
+DILIGENT_BEGIN_INTERFACE(IArchiver, IObject)
 {
     // AZ TODO
     VIRTUAL Bool METHOD(SerializeToBlob)(THIS_
@@ -117,13 +117,13 @@ DILIGENT_END_INTERFACE
 
 #if DILIGENT_C_INTERFACE
 
-#    define IArchiveBuilder_SerializeToBlob(This, ...)                  CALL_IFACE_METHOD(ArchiveBuilder, SerializeToBlob,                  This, __VA_ARGS__)
-#    define IArchiveBuilder_SerializeToStream(This, ...)                CALL_IFACE_METHOD(ArchiveBuilder, SerializeToStream,                This, __VA_ARGS__)
-#    define IArchiveBuilder_ArchiveGraphicsPipelineState(This, ...)     CALL_IFACE_METHOD(ArchiveBuilder, ArchiveGraphicsPipelineState,     This, __VA_ARGS__)
-#    define IArchiveBuilder_ArchiveComputePipelineState(This, ...)      CALL_IFACE_METHOD(ArchiveBuilder, ArchiveComputePipelineState,      This, __VA_ARGS__)
-#    define IArchiveBuilder_ArchiveRayTracingPipelineState(This, ...)   CALL_IFACE_METHOD(ArchiveBuilder, ArchiveRayTracingPipelineState,   This, __VA_ARGS__)
-#    define IArchiveBuilder_ArchiveTilePipelineState(This, ...)         CALL_IFACE_METHOD(ArchiveBuilder, ArchiveTilePipelineState,         This, __VA_ARGS__)
-#    define IArchiveBuilder_ArchivePipelineResourceSignature(This, ...) CALL_IFACE_METHOD(ArchiveBuilder, ArchivePipelineResourceSignature, This, __VA_ARGS__)
+#    define IArchiver_SerializeToBlob(This, ...)                  CALL_IFACE_METHOD(Archiver, SerializeToBlob,                  This, __VA_ARGS__)
+#    define IArchiver_SerializeToStream(This, ...)                CALL_IFACE_METHOD(Archiver, SerializeToStream,                This, __VA_ARGS__)
+#    define IArchiver_ArchiveGraphicsPipelineState(This, ...)     CALL_IFACE_METHOD(Archiver, ArchiveGraphicsPipelineState,     This, __VA_ARGS__)
+#    define IArchiver_ArchiveComputePipelineState(This, ...)      CALL_IFACE_METHOD(Archiver, ArchiveComputePipelineState,      This, __VA_ARGS__)
+#    define IArchiver_ArchiveRayTracingPipelineState(This, ...)   CALL_IFACE_METHOD(Archiver, ArchiveRayTracingPipelineState,   This, __VA_ARGS__)
+#    define IArchiver_ArchiveTilePipelineState(This, ...)         CALL_IFACE_METHOD(Archiver, ArchiveTilePipelineState,         This, __VA_ARGS__)
+#    define IArchiver_ArchivePipelineResourceSignature(This, ...) CALL_IFACE_METHOD(Archiver, ArchivePipelineResourceSignature, This, __VA_ARGS__)
 
 #endif
 

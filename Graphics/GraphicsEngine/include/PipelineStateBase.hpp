@@ -542,11 +542,8 @@ public:
                                TShaderStages&                         ShaderStages,
                                SHADER_TYPE&                           ActiveShaderStages)
     {
-        VERIFY_EXPR(CreateInfo.PSODesc.IsAnyGraphicsPipeline());
-
         ShaderStages.clear();
-        ActiveShaderStages = SHADER_TYPE_UNKNOWN;
-
+        ActiveShaderStages  = SHADER_TYPE_UNKNOWN;
         auto AddShaderStage = [&](IShader* pShader) {
             if (pShader != nullptr)
             {
@@ -596,8 +593,6 @@ public:
                                TShaderStages&                        ShaderStages,
                                SHADER_TYPE&                          ActiveShaderStages)
     {
-        VERIFY_EXPR(CreateInfo.PSODesc.IsComputePipeline());
-
         ShaderStages.clear();
 
         VERIFY_EXPR(CreateInfo.PSODesc.PipelineType == PIPELINE_TYPE_COMPUTE);
@@ -615,8 +610,6 @@ public:
                                TShaderStages&                           ShaderStages,
                                SHADER_TYPE&                             ActiveShaderStages)
     {
-        VERIFY_EXPR(CreateInfo.PSODesc.IsRayTracingPipeline());
-
         std::unordered_set<IShader*> UniqueShaders;
 
         auto AddShader = [&ShaderStages, &UniqueShaders, &ActiveShaderStages](IShader* pShader) {
@@ -673,8 +666,6 @@ public:
                                TShaderStages&                     ShaderStages,
                                SHADER_TYPE&                       ActiveShaderStages)
     {
-        VERIFY_EXPR(CreateInfo.PSODesc.IsTilePipeline());
-
         ShaderStages.clear();
 
         VERIFY_EXPR(CreateInfo.PSODesc.PipelineType == PIPELINE_TYPE_TILE);
@@ -688,12 +679,36 @@ public:
     }
 
 protected:
-    template <typename ShaderImplType, typename PSOCreateInfoType, typename TShaderStages>
-    void ExtractShaders(const PSOCreateInfoType& PSOCreateInfo,
-                        TShaderStages&           ShaderStages)
+    template <typename ShaderImplType, typename TShaderStages>
+    void ExtractShaders(const GraphicsPipelineStateCreateInfo& CreateInfo,
+                        TShaderStages&                         ShaderStages)
     {
-        VERIFY_EXPR(this->m_Desc.PipelineType == PSOCreateInfo.PSODesc.PipelineType);
-        ExtractShaders<ShaderImplType>(PSOCreateInfo, ShaderStages, m_ActiveShaderStages);
+        VERIFY_EXPR(this->m_Desc.IsAnyGraphicsPipeline());
+        ExtractShaders<ShaderImplType>(CreateInfo, ShaderStages, m_ActiveShaderStages);
+    }
+
+    template <typename ShaderImplType, typename TShaderStages>
+    void ExtractShaders(const ComputePipelineStateCreateInfo& CreateInfo,
+                        TShaderStages&                        ShaderStages)
+    {
+        VERIFY_EXPR(this->m_Desc.IsComputePipeline());
+        ExtractShaders<ShaderImplType>(CreateInfo, ShaderStages, m_ActiveShaderStages);
+    }
+
+    template <typename ShaderImplType, typename TShaderStages>
+    void ExtractShaders(const RayTracingPipelineStateCreateInfo& CreateInfo,
+                        TShaderStages&                           ShaderStages)
+    {
+        VERIFY_EXPR(this->m_Desc.IsRayTracingPipeline());
+        ExtractShaders<ShaderImplType>(CreateInfo, ShaderStages, m_ActiveShaderStages);
+    }
+
+    template <typename ShaderImplType, typename TShaderStages>
+    void ExtractShaders(const TilePipelineStateCreateInfo& CreateInfo,
+                        TShaderStages&                     ShaderStages)
+    {
+        VERIFY_EXPR(this->m_Desc.IsTilePipeline());
+        ExtractShaders<ShaderImplType>(CreateInfo, ShaderStages, m_ActiveShaderStages);
     }
 
     void InitializePipelineDesc(const GraphicsPipelineStateCreateInfo& CreateInfo,

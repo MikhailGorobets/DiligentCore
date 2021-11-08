@@ -204,12 +204,12 @@ struct SerializableResourceSignatureImpl::TPRS
 
 
 SerializableResourceSignatureImpl::SerializableResourceSignatureImpl(IReferenceCounters*                  pRefCounters,
-                                                                     DummyRenderDevice*                   pDevice,
+                                                                     SerializationDeviceImpl*             pDevice,
                                                                      const PipelineResourceSignatureDesc& Desc,
                                                                      Uint32                               DeviceBits) :
     TBase{pRefCounters}
 {
-    ValidatePipelineResourceSignatureDesc(Desc, pDevice);
+    ValidatePipelineResourceSignatureDesc(Desc, pDevice->GetDevice());
 
     const auto AddPRSDesc = [this](const PipelineResourceSignatureDesc& Desc, const PipelineResourceSignatureSerializedData& Serialized) //
     {

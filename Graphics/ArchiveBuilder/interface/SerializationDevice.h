@@ -27,33 +27,31 @@
 #pragma once
 
 /// \file
-/// Defines Diligent::IArchiveBuilderFactory interface
+/// Defines Diligent::ISerializationDevice interface
 
-#include "../../../Primitives/interface/Object.h"
-#include "ArchiveBuilder.h"
 #include "Shader.h"
+#include "RenderPass.h"
+#include "PipelineResourceSignature.h"
 
 DILIGENT_BEGIN_NAMESPACE(Diligent)
 
-// {F20B91EB-BDE3-4615-81CC-F720AA32410E}
-static const INTERFACE_ID IID_ArchiveBuilderFactory =
-    {0xf20b91eb, 0xbde3, 0x4615, {0x81, 0xcc, 0xf7, 0x20, 0xaa, 0x32, 0x41, 0xe}};
+// {205BB0B2-0966-4F51-9380-46EE5BCED28B}
+static const INTERFACE_ID IID_SerializationDevice =
+    {0x205bb0b2, 0x966, 0x4f51, {0x93, 0x80, 0x46, 0xee, 0x5b, 0xce, 0xd2, 0x8b}};
 
-#define DILIGENT_INTERFACE_NAME IArchiveBuilderFactory
+
+#define DILIGENT_INTERFACE_NAME ISerializationDevice
 #include "../../../Primitives/interface/DefineInterfaceHelperMacros.h"
 
-#define IArchiveBuilderFactoryInclusiveMethods \
-    IObjectInclusiveMethods;                   \
-    IArchiveBuilderFactoryMethods ArchiveBuilderFactory
+#define ISerializationDeviceInclusiveMethods \
+    IObjectInclusiveMethods;                 \
+    ISerializationDeviceMethods SerializationDevice
 
 // clang-format off
 
-DILIGENT_BEGIN_INTERFACE(IArchiveBuilderFactory, IObject)
+// AZ TODO
+DILIGENT_BEGIN_INTERFACE(ISerializationDevice, IObject)
 {
-    // AZ TODO
-    VIRTUAL void METHOD(CreateArchiveBuilder)(THIS_
-                                              IArchiveBuilder** ppBuilder) PURE;
-    
     // AZ TODO
     VIRTUAL void METHOD(CreateShader)(THIS_
                                       const ShaderCreateInfo REF ShaderCI,
@@ -76,11 +74,6 @@ DILIGENT_END_INTERFACE
 #include "../../../Primitives/interface/UndefInterfaceHelperMacros.h"
 
 #if DILIGENT_C_INTERFACE
-
-#    define IArchiveBuilderFactory_CreateArchiveBuilder(This, ...)             CALL_IFACE_METHOD(ArchiveBuilderFactory, CreateArchiveBuilder,            This, __VA_ARGS__)
-#    define IArchiveBuilderFactory_CreateShader(This, ...)                     CALL_IFACE_METHOD(ArchiveBuilderFactory, CreateShader,                    This, __VA_ARGS__)
-#    define IArchiveBuilderFactory_CreateRenderPass(This, ...)                 CALL_IFACE_METHOD(ArchiveBuilderFactory, CreateRenderPass,                This, __VA_ARGS__)
-#    define IArchiveBuilderFactory_CreatePipelineResourceSignature(This, ...)  CALL_IFACE_METHOD(ArchiveBuilderFactory, CreatePipelineResourceSignature, This, __VA_ARGS__)
 
 #endif
 

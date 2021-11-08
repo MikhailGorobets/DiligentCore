@@ -76,10 +76,10 @@ const ShaderVkImpl* SerializableShaderImpl::GetShaderVk() const
 #endif // VULKAN_SUPPORTED
 
 
-SerializableShaderImpl::SerializableShaderImpl(IReferenceCounters*     pRefCounters,
-                                               DummyRenderDevice*      pDevice,
-                                               const ShaderCreateInfo& ShaderCI,
-                                               Uint32                  DeviceBits) :
+SerializableShaderImpl::SerializableShaderImpl(IReferenceCounters*      pRefCounters,
+                                               SerializationDeviceImpl* pDevice,
+                                               const ShaderCreateInfo&  ShaderCI,
+                                               Uint32                   DeviceBits) :
     TBase{pRefCounters},
     m_CreateInfo{ShaderCI}
 {
@@ -108,8 +108,8 @@ SerializableShaderImpl::SerializableShaderImpl(IReferenceCounters*     pRefCount
             {
                 const ShaderD3D12Impl::CreateInfo D3D12ShaderCI{
                     pDevice->GetDxCompilerForDirect3D12(),
-                    pDevice->GetDeviceInfo(),
-                    pDevice->GetAdapterInfo(),
+                    pDevice->GetDevice()->GetDeviceInfo(),
+                    pDevice->GetDevice()->GetAdapterInfo(),
                     pDevice->GetD3D12ShaderVersion() //
                 };
                 m_pShaderD3D12.reset(new CompiledShaderD3D12{pRefCounters, ShaderCI, D3D12ShaderCI});
@@ -129,8 +129,8 @@ SerializableShaderImpl::SerializableShaderImpl(IReferenceCounters*     pRefCount
             {
                 const ShaderVkImpl::CreateInfo VkShaderCI{
                     pDevice->GetDxCompilerForVulkan(),
-                    pDevice->GetDeviceInfo(),
-                    pDevice->GetAdapterInfo(),
+                    pDevice->GetDevice()->GetDeviceInfo(),
+                    pDevice->GetDevice()->GetAdapterInfo(),
                     pDevice->GetVkVersion(),
                     pDevice->HasSpirv14() //
                 };

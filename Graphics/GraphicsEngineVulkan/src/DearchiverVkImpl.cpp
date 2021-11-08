@@ -26,19 +26,19 @@
 
 #include "pch.h"
 #include "RenderDeviceVkImpl.hpp"
-#include "SerializationAPIVkImpl.hpp"
+#include "DearchiverVkImpl.hpp"
 #include "DeviceObjectArchiveVkImpl.hpp"
 
 namespace Diligent
 {
 
-SerializationAPIVkImpl::SerializationAPIVkImpl(IReferenceCounters* pRefCounters) :
-    TSerializationAPIBase{pRefCounters}
+DearchiverVkImpl::DearchiverVkImpl(IReferenceCounters* pRefCounters) :
+    TDearchiverBase{pRefCounters}
 {
 }
 
-void SerializationAPIVkImpl::CreateDeviceObjectArchive(IArchive*              pSource,
-                                                       IDeviceObjectArchive** ppArchive)
+void DearchiverVkImpl::CreateDeviceObjectArchive(IArchive*              pSource,
+                                                 IDeviceObjectArchive** ppArchive)
 {
     DEV_CHECK_ERR(ppArchive != nullptr, "ppArchive must not be null");
     if (!ppArchive)
@@ -57,7 +57,7 @@ void SerializationAPIVkImpl::CreateDeviceObjectArchive(IArchive*              pS
     }
 }
 
-void SerializationAPIVkImpl::UnpackPipelineState(const PipelineStateUnpackInfo& DeArchiveInfo, IPipelineState** ppPSO)
+void DearchiverVkImpl::UnpackPipelineState(const PipelineStateUnpackInfo& DeArchiveInfo, IPipelineState** ppPSO)
 {
     if (!VerifyUnpackPipelineState(DeArchiveInfo, ppPSO))
         return;
@@ -85,7 +85,7 @@ void SerializationAPIVkImpl::UnpackPipelineState(const PipelineStateUnpackInfo& 
     }
 }
 
-void SerializationAPIVkImpl::UnpackResourceSignature(const ResourceSignatureUnpackInfo& DeArchiveInfo, IPipelineResourceSignature** ppSignature)
+void DearchiverVkImpl::UnpackResourceSignature(const ResourceSignatureUnpackInfo& DeArchiveInfo, IPipelineResourceSignature** ppSignature)
 {
     if (!VerifyUnpackResourceSignature(DeArchiveInfo, ppSignature))
         return;
@@ -96,7 +96,7 @@ void SerializationAPIVkImpl::UnpackResourceSignature(const ResourceSignatureUnpa
     pArchiveVk->UnpackResourceSignature(DeArchiveInfo, *ppSignature);
 }
 
-void SerializationAPIVkImpl::UnpackRenderPass(const RenderPassUnpackInfo& DeArchiveInfo, IRenderPass** ppRP)
+void DearchiverVkImpl::UnpackRenderPass(const RenderPassUnpackInfo& DeArchiveInfo, IRenderPass** ppRP)
 {
     if (!VerifyUnpackRenderPass(DeArchiveInfo, ppRP))
         return;

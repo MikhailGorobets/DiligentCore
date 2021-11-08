@@ -44,7 +44,7 @@
 #include "EngineFactoryBase.hpp"
 #include "EngineMemory.h"
 #include "CommandQueueD3D12Impl.hpp"
-#include "SerializationAPID3D12Impl.hpp"
+#include "DearchiverD3D12Impl.hpp"
 
 #ifndef NOMINMAX
 #    define NOMINMAX
@@ -110,9 +110,9 @@ public:
     virtual GraphicsAdapterInfo GetGraphicsAdapterInfo(void*          pd3dDevice,
                                                        IDXGIAdapter1* pDXIAdapter) const override final;
 
-    virtual ISerializationAPI* DILIGENT_CALL_TYPE GetSerializationAPI() override final
+    virtual IDearchiver* DILIGENT_CALL_TYPE GetDearchiver() override final
     {
-        return &m_SerializationAPI;
+        return &m_Dearchiver;
     }
 
 private:
@@ -121,7 +121,7 @@ private:
     std::string m_DllName;
 #endif
 
-    SerializationAPID3D12Impl m_SerializationAPI{nullptr}; // AZ TODO
+    DearchiverD3D12Impl m_Dearchiver{nullptr}; // AZ TODO
 };
 
 bool EngineFactoryD3D12Impl::LoadD3D12(const char* DllName)

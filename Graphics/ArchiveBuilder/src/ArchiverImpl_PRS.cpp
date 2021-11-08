@@ -24,17 +24,17 @@
  *  of the possibility of such damages.
  */
 
-#include "ArchiveBuilderImpl.hpp"
+#include "ArchiverImpl.hpp"
 
 namespace Diligent
 {
 
-const SerializedMemory& ArchiveBuilderImpl::PRSData::GetSharedData() const
+const SerializedMemory& ArchiverImpl::PRSData::GetSharedData() const
 {
     return pPRS->GetSharedSerializedMemory();
 }
 
-const SerializedMemory& ArchiveBuilderImpl::PRSData::GetDeviceData(Uint32 Idx) const
+const SerializedMemory& ArchiverImpl::PRSData::GetDeviceData(Uint32 Idx) const
 {
     static const SerializedMemory Empty;
     switch (static_cast<DeviceType>(Idx))
@@ -52,7 +52,7 @@ const SerializedMemory& ArchiveBuilderImpl::PRSData::GetDeviceData(Uint32 Idx) c
     }
 }
 
-bool ArchiveBuilderImpl::AddPipelineResourceSignature(IPipelineResourceSignature* pPRS)
+bool ArchiverImpl::AddPipelineResourceSignature(IPipelineResourceSignature* pPRS)
 {
     DEV_CHECK_ERR(pPRS != nullptr, "pPRS must not be null");
     if (pPRS == nullptr)
@@ -75,11 +75,11 @@ bool ArchiveBuilderImpl::AddPipelineResourceSignature(IPipelineResourceSignature
     return true;
 }
 
-Bool ArchiveBuilderImpl::ArchivePipelineResourceSignature(const PipelineResourceSignatureDesc& SignatureDesc,
-                                                          const ResourceSignatureArchiveInfo&  ArchiveInfo)
+Bool ArchiverImpl::ArchivePipelineResourceSignature(const PipelineResourceSignatureDesc& SignatureDesc,
+                                                    const ResourceSignatureArchiveInfo&  ArchiveInfo)
 {
     RefCntAutoPtr<IPipelineResourceSignature> pPRS;
-    m_pArchiveFactory->CreatePipelineResourceSignature(SignatureDesc, ArchiveInfo.DeviceBits, &pPRS);
+    m_pSerializationDevice->CreatePipelineResourceSignature(SignatureDesc, ArchiveInfo.DeviceBits, &pPRS);
     if (!pPRS)
         return false;
 

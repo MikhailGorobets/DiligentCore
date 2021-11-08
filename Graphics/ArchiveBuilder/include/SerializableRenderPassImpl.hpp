@@ -28,7 +28,7 @@
 
 #include "RenderPass.h"
 #include "RenderPassBase.hpp"
-#include "DummyRenderDevice.hpp"
+#include "SerializationDeviceImpl.hpp"
 #include "SerializedMemory.hpp"
 
 namespace Diligent
@@ -39,9 +39,9 @@ class SerializableRenderPassImpl final : public RenderPassBase<SerializationEngi
 public:
     using TBase = RenderPassBase<SerializationEngineImplTraits>;
 
-    SerializableRenderPassImpl(IReferenceCounters*   pRefCounters,
-                               DummyRenderDevice*    pDevice,
-                               const RenderPassDesc& Desc);
+    SerializableRenderPassImpl(IReferenceCounters*      pRefCounters,
+                               SerializationDeviceImpl* pDevice,
+                               const RenderPassDesc&    Desc);
 
     ~SerializableRenderPassImpl() override;
 

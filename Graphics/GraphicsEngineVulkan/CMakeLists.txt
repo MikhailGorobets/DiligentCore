@@ -31,7 +31,7 @@ set(INCLUDE
     include/RenderPassVkImpl.hpp
     include/RenderPassCache.hpp
     include/SamplerVkImpl.hpp
-    include/SerializationAPIVkImpl.hpp
+    include/DearchiverVkImpl.hpp
     include/ShaderVkImpl.hpp
     include/ShaderResourceBindingVkImpl.hpp
     include/ShaderResourceCacheVk.hpp
@@ -112,7 +112,7 @@ set(SRC
     src/RenderPassVkImpl.cpp
     src/RenderPassCache.cpp
     src/SamplerVkImpl.cpp
-    src/SerializationAPIVkImpl.cpp
+    src/DearchiverVkImpl.cpp
     src/ShaderVkImpl.cpp
     src/ShaderResourceBindingVkImpl.cpp
     src/ShaderResourceCacheVk.cpp
