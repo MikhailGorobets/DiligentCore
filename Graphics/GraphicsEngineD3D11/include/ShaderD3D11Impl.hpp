@@ -51,9 +51,25 @@ class ShaderD3D11Impl final : public ShaderBase<EngineD3D11ImplTraits>, public S
 public:
     using TShaderBase = ShaderBase<EngineD3D11ImplTraits>;
 
+    struct CreateInfo
+    {
+        const RenderDeviceInfo&    DeviceInfo;
+        const GraphicsAdapterInfo& AdapterInfo;
+        D3D_FEATURE_LEVEL          FeatureLevel;
+
+        CreateInfo(const RenderDeviceInfo&    _DeviceInfo,
+                   const GraphicsAdapterInfo& _AdapterInfo,
+                   D3D_FEATURE_LEVEL          _FeatureLevel) noexcept :
+            DeviceInfo{_DeviceInfo},
+            AdapterInfo{_AdapterInfo},
+            FeatureLevel{_FeatureLevel}
+        {}
+    };
     ShaderD3D11Impl(IReferenceCounters*          pRefCounters,
                     class RenderDeviceD3D11Impl* pRenderDeviceD3D11,
-                    const ShaderCreateInfo&      ShaderCI);
+                    const ShaderCreateInfo&      ShaderCI,
+                    const CreateInfo&            D3D11ShaderCI,
+                    bool                         IsDeviceInternal = false);
     ~ShaderD3D11Impl();
 
     virtual void DILIGENT_CALL_TYPE QueryInterface(const INTERFACE_ID& IID, IObject** ppInterface) override final;

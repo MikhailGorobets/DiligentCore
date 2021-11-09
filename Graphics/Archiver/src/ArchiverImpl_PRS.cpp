@@ -40,10 +40,10 @@ const SerializedMemory& ArchiverImpl::PRSData::GetDeviceData(Uint32 Idx) const
     switch (static_cast<DeviceType>(Idx))
     {
         // clang-format off
+        case DeviceType::Direct3D11: return pPRS->GetSerializedMemoryD3D11();
         case DeviceType::Direct3D12: return pPRS->GetSerializedMemoryD3D12();
+        case DeviceType::OpenGL:     return pPRS->GetSerializedMemoryGL();
         case DeviceType::Vulkan:     return pPRS->GetSerializedMemoryVk();
-        case DeviceType::OpenGL:
-        case DeviceType::Direct3D11:
         case DeviceType::Metal:
         // clang-format on
         case DeviceType::Count:

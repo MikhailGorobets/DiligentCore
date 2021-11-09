@@ -52,6 +52,14 @@
 #include "SerializableRenderPassImpl.hpp"
 #include "SerializableResourceSignatureImpl.hpp"
 
+#if D3D11_SUPPORTED
+#    include "../../GraphicsEngineD3D11/include/pch.h"
+#    include "RenderDeviceD3D11Impl.hpp"
+#    include "PipelineResourceSignatureD3D11Impl.hpp"
+#    include "PipelineStateD3D11Impl.hpp"
+#    include "ShaderD3D11Impl.hpp"
+#    include "DeviceObjectArchiveD3D11Impl.hpp"
+#endif
 #if D3D12_SUPPORTED
 #    include "../../GraphicsEngineD3D12/include/pch.h"
 #    include "RenderDeviceD3D12Impl.hpp"
@@ -59,6 +67,14 @@
 #    include "PipelineStateD3D12Impl.hpp"
 #    include "ShaderD3D12Impl.hpp"
 #    include "DeviceObjectArchiveD3D12Impl.hpp"
+#endif
+#if GL_SUPPORTED || GLES_SUPPORTED
+#    include "../../GraphicsEngineOpenGL/include/pch.h"
+#    include "RenderDeviceGLImpl.hpp"
+#    include "PipelineResourceSignatureGLImpl.hpp"
+#    include "PipelineStateGLImpl.hpp"
+#    include "ShaderGLImpl.hpp"
+#    include "DeviceObjectArchiveGLImpl.hpp"
 #endif
 #if VULKAN_SUPPORTED
 #    include "VulkanUtilities/VulkanHeaders.h"
@@ -210,10 +226,17 @@ private:
                       const CreateInfoType&                                 PSOCreateInfo,
                       const PipelineStateArchiveInfo&                       ArchiveInfo) noexcept;
 
+    void SerializeShaderBytecode(TShaderIndices& ShaderIndices, DeviceType DevType, const ShaderCreateInfo& CI, const void* Bytecode, size_t BytecodeSize);
+    void SerializeShaderSource(TShaderIndices& ShaderIndices, DeviceType DevType, const ShaderCreateInfo& CI);
+
     template <typename CreateInfoType>
     bool PatchShadersVk(const CreateInfoType& CreateInfo, TShaderIndices& ShaderIndices);
     template <typename CreateInfoType>
     bool PatchShadersD3D12(const CreateInfoType& CreateInfo, TShaderIndices& ShaderIndices);
+    template <typename CreateInfoType>
+    bool PatchShadersD3D11(const CreateInfoType& CreateInfo, TShaderIndices& ShaderIndices);
+    template <typename CreateInfoType>
+    bool PatchShadersGL(const CreateInfoType& CreateInfo, TShaderIndices& ShaderIndices);
 
     void SerializeShadersForPSO(const TShaderIndices& ShaderIndices, SerializedMemory& DeviceData) const;
 

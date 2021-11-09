@@ -602,9 +602,24 @@ bool DeviceObjectArchiveBase::LoadShaders(Serializer<SerializerMode::Read>&    S
 
         Serializer<SerializerMode::Read> Ser2{pData, OffsetAndSize.Size};
         ShaderCreateInfo                 ShaderCI;
-        Ser2(ShaderCI.Desc.ShaderType, ShaderCI.EntryPoint);
-        ShaderCI.ByteCode     = Ser2.GetCurrentPtr();
-        ShaderCI.ByteCodeSize = Ser2.GetRemainSize();
+        Ser2(ShaderCI.Desc.ShaderType, ShaderCI.EntryPoint, ShaderCI.SourceLanguage, ShaderCI.ShaderCompiler);
+
+        if (m_DevType == DeviceType::OpenGL)
+        {
+            ShaderCI.Source                     = static_cast<const Char*>(Ser2.GetCurrentPtr());
+            ShaderCI.SourceLength               = Ser2.GetRemainSize();
+            ShaderCI.UseCombinedTextureSamplers = true;
+
+            VERIFY_EXPR(ShaderCI.SourceLength == strlen(ShaderCI.Source) + 1);
+        }
+        else
+        {
+            VERIFY_EXPR(ShaderCI.SourceLanguage == SHADER_SOURCE_LANGUAGE_DEFAULT);
+            VERIFY_EXPR(ShaderCI.ShaderCompiler == SHADER_COMPILER_DEFAULT);
+
+            ShaderCI.ByteCode     = Ser2.GetCurrentPtr();
+            ShaderCI.ByteCodeSize = Ser2.GetRemainSize();
+        }
 
         pDevice->CreateShader(ShaderCI, &Shaders[i]);
         if (!Shaders[i])

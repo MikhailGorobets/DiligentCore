@@ -145,7 +145,7 @@ public:
         return m_End - m_Ptr;
     }
 
-    TPointer GetCurrentPtr() const
+    const void* GetCurrentPtr() const
     {
         return m_Ptr;
     }
