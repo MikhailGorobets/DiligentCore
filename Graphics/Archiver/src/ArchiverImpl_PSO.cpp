@@ -83,7 +83,7 @@ const SerializedMemory& ArchiverImpl::RPData::GetSharedData() const
 
 void ArchiverImpl::SerializeShaderBytecode(TShaderIndices& ShaderIndices, DeviceType DevType, const ShaderCreateInfo& CI, const void* Bytecode, size_t BytecodeSize)
 {
-    auto&                        ShaderMap       = m_Shaders[Uint32{DevType}].Map;
+    auto&                        ShaderMap       = m_Shaders[static_cast<Uint32>(DevType)].Map;
     auto&                        RawMemAllocator = GetRawAllocator();
     const SHADER_SOURCE_LANGUAGE SourceLanguage  = SHADER_SOURCE_LANGUAGE_DEFAULT;
     const SHADER_COMPILER        ShaderCompiler  = SHADER_COMPILER_DEFAULT;
@@ -112,7 +112,7 @@ void ArchiverImpl::SerializeShaderBytecode(TShaderIndices& ShaderIndices, Device
 
 void ArchiverImpl::SerializeShaderSource(TShaderIndices& ShaderIndices, DeviceType DevType, const ShaderCreateInfo& CI)
 {
-    auto& ShaderMap       = m_Shaders[Uint32{DevType}].Map;
+    auto& ShaderMap       = m_Shaders[static_cast<Uint32>(DevType)].Map;
     auto& RawMemAllocator = GetRawAllocator();
 
     VERIFY_EXPR(CI.SourceLength > 0);
@@ -192,7 +192,7 @@ bool ArchiverImpl::PatchShadersVk(const CreateInfoType& CreateInfo, TShaderIndic
             const auto& Desc    = pSerPRS->GetDesc();
 
             Signatures[Desc.BindingIndex] = pSerPRS->GetSignatureVk();
-            SignaturesCount               = std::max(SignaturesCount, Uint32{Desc.BindingIndex} + 1);
+            SignaturesCount               = std::max(SignaturesCount, static_cast<Uint32>(Desc.BindingIndex) + 1);
         }
 
         // Same as PipelineLayoutVk::Create()
@@ -311,7 +311,7 @@ bool ArchiverImpl::PatchShadersD3D11(const CreateInfoType& CreateInfo, TShaderIn
             const auto& Desc    = pSerPRS->GetDesc();
 
             Signatures[Desc.BindingIndex] = pSerPRS->GetSignatureD3D11();
-            SignaturesCount               = std::max(SignaturesCount, Uint32{Desc.BindingIndex} + 1);
+            SignaturesCount               = std::max(SignaturesCount, static_cast<Uint32>(Desc.BindingIndex) + 1);
         }
 
         for (Uint32 i = 0; i < SignaturesCount; ++i)
@@ -399,7 +399,7 @@ bool ArchiverImpl::PatchShadersD3D12(const CreateInfoType& CreateInfo, TShaderIn
             const auto& Desc    = pSerPRS->GetDesc();
 
             Signatures[Desc.BindingIndex] = pSerPRS->GetSignatureD3D12();
-            SignaturesCount               = std::max(SignaturesCount, Uint32{Desc.BindingIndex} + 1);
+            SignaturesCount               = std::max(SignaturesCount, static_cast<Uint32>(Desc.BindingIndex) + 1);
         }
 
         RootSignatureD3D12 RootSig{nullptr, nullptr, Signatures.data(), SignaturesCount, 0};
@@ -612,7 +612,7 @@ bool ArchiverImpl::SerializePSO(std::unordered_map<String, TPSOData<CreateInfoTy
                 if (!PatchShadersD3D11(PSOCreateInfo, ShaderIndices))
                     return false;
 
-                SerializeShadersForPSO(ShaderIndices, Data.PerDeviceData[Uint32{DeviceType::Direct3D11}]);
+                SerializeShadersForPSO(ShaderIndices, Data.PerDeviceData[static_cast<Uint32>(DeviceType::Direct3D11)]);
                 break;
             }
 #endif
@@ -624,7 +624,7 @@ bool ArchiverImpl::SerializePSO(std::unordered_map<String, TPSOData<CreateInfoTy
                 if (!PatchShadersD3D12(PSOCreateInfo, ShaderIndices))
                     return false;
 
-                SerializeShadersForPSO(ShaderIndices, Data.PerDeviceData[Uint32{DeviceType::Direct3D12}]);
+                SerializeShadersForPSO(ShaderIndices, Data.PerDeviceData[static_cast<Uint32>(DeviceType::Direct3D12)]);
                 break;
             }
 #endif
@@ -637,7 +637,7 @@ bool ArchiverImpl::SerializePSO(std::unordered_map<String, TPSOData<CreateInfoTy
                 if (!PatchShadersGL(PSOCreateInfo, ShaderIndices))
                     return false;
 
-                SerializeShadersForPSO(ShaderIndices, Data.PerDeviceData[Uint32{DeviceType::OpenGL}]);
+                SerializeShadersForPSO(ShaderIndices, Data.PerDeviceData[static_cast<Uint32>(DeviceType::OpenGL)]);
                 break;
             }
 #endif
@@ -649,7 +649,7 @@ bool ArchiverImpl::SerializePSO(std::unordered_map<String, TPSOData<CreateInfoTy
                 if (!PatchShadersVk(PSOCreateInfo, ShaderIndices))
                     return false;
 
-                SerializeShadersForPSO(ShaderIndices, Data.PerDeviceData[Uint32{DeviceType::Vulkan}]);
+                SerializeShadersForPSO(ShaderIndices, Data.PerDeviceData[static_cast<Uint32>(DeviceType::Vulkan)]);
                 break;
             }
 #endif

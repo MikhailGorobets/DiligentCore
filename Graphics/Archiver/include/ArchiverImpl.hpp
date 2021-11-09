@@ -139,7 +139,8 @@ private:
     using ShaderIndexArray         = DeviceObjectArchiveBase::ShaderIndexArray;
 
     static constexpr auto   InvalidOffset   = DeviceObjectArchiveBase::BaseDataHeader::InvalidOffset;
-    static constexpr Uint32 DeviceDataCount = Uint32{DeviceType::Count};
+    static constexpr Uint32 DeviceDataCount = static_cast<Uint32>(DeviceType::Count);
+    static constexpr Uint32 ChunkCount      = static_cast<Uint32>(ChunkType::Count);
     using TPerDeviceData                    = std::array<SerializedMemory, DeviceDataCount>;
 
     struct PRSData
@@ -174,7 +175,7 @@ private:
     {
         std::unordered_map<ShaderKey, /*Index*/ size_t, ShaderKeyHash> Map;
     };
-    std::array<PerDeviceShaders, Uint32{DeviceType::Count}> m_Shaders;
+    std::array<PerDeviceShaders, static_cast<Uint32>(DeviceType::Count)> m_Shaders;
 
     template <typename CreateInfoType>
     struct TPSOData
@@ -202,13 +203,13 @@ private:
     struct PendingData
     {
         // AZ TODO: use SerializedMemory instead of vector
-        std::vector<Uint8>                                       HeaderData;                   // ArchiveHeader, ChunkHeader[]
-        std::array<std::vector<Uint8>, Uint32{ChunkType::Count}> ChunkData;                    // NamedResourceArrayHeader
-        std::array<Uint32*, Uint32{ChunkType::Count}>            DataOffsetArrayPerChunk = {}; // pointer to NamedResourceArrayHeader::DataOffset - offsets to ***DataHeader
-        std::array<Uint32, Uint32{ChunkType::Count}>             ResourceCountPerChunk   = {}; //
-        std::vector<Uint8>                                       SharedData;                   // ***DataHeader
-        std::array<std::vector<Uint8>, DeviceDataCount>          PerDeviceData;                // device specific data
-        size_t                                                   OffsetInFile = 0;
+        std::vector<Uint8>                              HeaderData;                   // ArchiveHeader, ChunkHeader[]
+        std::array<std::vector<Uint8>, ChunkCount>      ChunkData;                    // NamedResourceArrayHeader
+        std::array<Uint32*, ChunkCount>                 DataOffsetArrayPerChunk = {}; // pointer to NamedResourceArrayHeader::DataOffset - offsets to ***DataHeader
+        std::array<Uint32, ChunkCount>                  ResourceCountPerChunk   = {}; //
+        std::vector<Uint8>                              SharedData;                   // ***DataHeader
+        std::array<std::vector<Uint8>, DeviceDataCount> PerDeviceData;                // device specific data
+        size_t                                          OffsetInFile = 0;
     };
 
     void ReserveSpace(size_t& SharedDataSize, std::array<size_t, DeviceDataCount>& PerDeviceDataSize) const;

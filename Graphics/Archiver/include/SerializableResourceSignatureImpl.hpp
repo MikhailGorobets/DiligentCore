@@ -114,8 +114,6 @@ private:
     SerializedMemory                               m_DescMem;
     SerializedMemory                               m_SharedData;
 
-    using DeviceType = DeviceObjectArchiveBase::DeviceType;
-
     template <typename ImplType> struct TPRS;
 #if D3D11_SUPPORTED
     std::unique_ptr<TPRS<PipelineResourceSignatureD3D11Impl>> m_pPRSD3D11;

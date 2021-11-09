@@ -203,7 +203,7 @@ public:
                                                                     Uint32                               DeviceBits,
                                                                     IPipelineResourceSignature**         ppSignature) override final;
 
-#if D3D12_SUPPORTED
+#if D3D11_SUPPORTED
     D3D_FEATURE_LEVEL GetD3D11FeatureLevel() const
     {
         return D3D_FEATURE_LEVEL_11_1;

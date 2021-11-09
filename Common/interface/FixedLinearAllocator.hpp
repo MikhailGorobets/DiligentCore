@@ -140,7 +140,7 @@ public:
 
     void AddSpaceForString(const Char* str) noexcept
     {
-        if (str != nullptr)
+        if (str != nullptr && *str != '\0')
             AddSpace<Char>(strlen(str) + 1);
     }
 
@@ -248,10 +248,13 @@ public:
         return Dst;
     }
 
-    NODISCARD Char* CopyString(const char* Str)
+    NODISCARD const Char* CopyString(const char* Str)
     {
         if (Str == nullptr)
             return nullptr;
+
+        if (*Str == '\0')
+            return "";
 
         auto* Ptr = reinterpret_cast<Char*>(Allocate(strlen(Str) + 1, 1));
         Char* Dst = Ptr;
@@ -270,7 +273,7 @@ public:
         return Ptr;
     }
 
-    NODISCARD Char* CopyString(const std::string& Str)
+    NODISCARD const Char* CopyString(const std::string& Str)
     {
         return CopyString(Str.c_str());
     }

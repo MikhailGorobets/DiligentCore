@@ -26,6 +26,8 @@
 
 #pragma once
 
+#include "BasicTypes.h"
+
 namespace Diligent
 {
 
