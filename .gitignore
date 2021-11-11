@@ -25,3 +25,8 @@ ehthumbs.db
 ehthumbs_vista.db
 # Folder config file
 [Dd]esktop.ini
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class

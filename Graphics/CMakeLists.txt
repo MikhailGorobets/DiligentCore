@@ -50,6 +50,7 @@ endif()
 
 if(PLATFORM_WIN32 OR PLATFORM_LINUX OR PLATFORM_MACOS)
     add_subdirectory(Archiver)
+    add_subdirectory(ArchiverJSON)
 endif()
 
 add_subdirectory(GraphicsTools)
