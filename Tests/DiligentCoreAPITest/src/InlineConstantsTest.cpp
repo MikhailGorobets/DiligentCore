@@ -108,7 +108,7 @@ const std::string VulkanPushConstants_VS{
 struct PushConstants_t
 {
     float4 g_Positions[6];
-    float4 g_Colors[3];
+    // Make VS push constant size smaller than PS
 };
 
 [[vk::push_constant]] ConstantBuffer<PushConstants_t> PushConstants;
@@ -121,8 +121,12 @@ struct PSInput
 
 void main(uint VertexId : SV_VertexId, out PSInput PSIn)
 {
+    float4 Colors[3];
+    Colors[0] = float4(1.0, 0.0, 0.0, 1.0);
+    Colors[1] = float4(0.0, 1.0, 0.0, 1.0);
+    Colors[2] = float4(0.0, 0.0, 1.0, 1.0);
     PSIn.Pos = PushConstants.g_Positions[VertexId];
-    PSIn.Color = PushConstants.g_Colors[VertexId % 3];
+    PSIn.Color = Colors[VertexId % 3];
 }
 )"};
 
@@ -131,7 +135,7 @@ const std::string VulkanPushConstants_PS{
 struct PushConstants_t
 {
     float4 g_Positions[6];
-    float4 g_Colors[3];
+    float4 g_Colors[3]; // Make PS push constant size larger than VS
 };
 
 [[vk::push_constant]] ConstantBuffer<PushConstants_t> PushConstants;
@@ -144,8 +148,6 @@ struct PSInput
 
 float4 main(in PSInput PSIn) : SV_Target
 {
-    // Use push constants from PS to apply color modulation
-    // This ensures both VS and PS access the same PushConstants
     return float4(
         PSIn.Color.r * PushConstants.g_Colors[0].r,
         PSIn.Color.g * PushConstants.g_Colors[1].g,
@@ -175,6 +177,55 @@ void main(uint3 DTid : SV_DispatchThreadID)
     g_Output[DTid.xy] = Color;
 }
 )"};
+
+
+const std::string DifferentSizesAcrossStages_VS{
+    R"(
+cbuffer cbInlineConstants
+{
+    float4 g_Positions[6];
+}
+
+struct PSInput
+{
+    float4 Pos   : SV_POSITION;
+    float3 Color : COLOR;
+};
+
+void main(uint VertexId : SV_VertexId, 
+          out  PSInput  PSIn)
+{
+    float3 Colors[3];
+    Colors[0] = float3(1.0, 0.0, 0.0);
+    Colors[1] = float3(0.0, 1.0, 0.0);
+    Colors[2] = float3(0.0, 0.0, 1.0);
+
+    PSIn.Pos   = g_Positions[VertexId];
+    PSIn.Color = Colors[VertexId % 3].rgb;
+}
+)"};
+
+const std::string DifferentSizesAcrossStages_PS{
+    R"(
+struct PSInput
+{
+    float4 Pos   : SV_POSITION;
+    float3 Color : COLOR;
+};
+
+cbuffer cbInlineConstants
+{
+    float4 g_Positions[6];
+    float4 g_ColorFactor;
+}
+
+float4 main(in PSInput PSIn) : SV_Target
+{
+    float3 Color = PSIn.Color.rgb * g_ColorFactor.rgb;
+    return float4(Color, 1.0);
+}
+)"};
+
 
 } // namespace HLSL
 
@@ -1314,6 +1365,115 @@ TEST_F(InlineConstants, VulkanPushConstants)
         pContext->Draw({6, DRAW_FLAG_VERIFY_ALL});
 
         Present();
+    }
+}
+
+TEST_F(InlineConstants, DifferentSizesAcrossStages)
+{
+    GPUTestingEnvironment* pEnv    = GPUTestingEnvironment::GetInstance();
+    IRenderDevice*         pDevice = pEnv->GetDevice();
+
+    if (!pDevice->GetDeviceInfo().Features.SeparablePrograms)
+        GTEST_SKIP();
+
+    IDeviceContext* pContext   = pEnv->GetDeviceContext();
+    ISwapChain*     pSwapChain = pEnv->GetSwapChain();
+
+    ShaderCreateInfo ShaderCI;
+    ShaderCI.SourceLanguage = SHADER_SOURCE_LANGUAGE_HLSL;
+    ShaderCI.ShaderCompiler = pEnv->GetDefaultCompiler(ShaderCI.SourceLanguage);
+
+    RefCntAutoPtr<IShader> pVS;
+    {
+        ShaderCI.Desc       = {"Different sizes across stages VS", SHADER_TYPE_VERTEX, true};
+        ShaderCI.EntryPoint = "main";
+        ShaderCI.Source     = HLSL::DifferentSizesAcrossStages_VS.c_str();
+        pDevice->CreateShader(ShaderCI, &pVS);
+        ASSERT_NE(pVS, nullptr);
+    }
+
+    RefCntAutoPtr<IShader> pPS;
+    {
+        ShaderCI.Desc       = {"Different sizes across stages PS", SHADER_TYPE_PIXEL, true};
+        ShaderCI.EntryPoint = "main";
+        ShaderCI.Source     = HLSL::DifferentSizesAcrossStages_PS.c_str();
+        pDevice->CreateShader(ShaderCI, &pPS);
+        ASSERT_NE(pPS, nullptr);
+    }
+
+    for (Uint32 pos_type = 0; pos_type < SHADER_RESOURCE_VARIABLE_TYPE_NUM_TYPES; ++pos_type)
+    {
+        const float ClearColor[] = {sm_Rnd(), sm_Rnd(), sm_Rnd(), sm_Rnd()};
+        RenderDrawCommandReference(pSwapChain, ClearColor);
+
+        SHADER_RESOURCE_VARIABLE_TYPE PosType = static_cast<SHADER_RESOURCE_VARIABLE_TYPE>(pos_type);
+
+        GraphicsPipelineStateCreateInfoX PsoCI{"Different sizes across stages test"};
+
+        PipelineResourceLayoutDescX ResLayoutDesc;
+        ResLayoutDesc
+            .AddVariable(SHADER_TYPE_VS_PS, "cbInlineConstants", PosType, SHADER_VARIABLE_FLAG_INLINE_CONSTANTS);
+
+        PsoCI
+            .AddRenderTarget(pSwapChain->GetDesc().ColorBufferFormat)
+            .SetPrimitiveTopology(PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+            .AddShader(pVS)
+            .AddShader(pPS)
+            .SetResourceLayout(ResLayoutDesc)
+            .SetSRBAllocationGranularity(4);
+        PsoCI.GraphicsPipeline.DepthStencilDesc.DepthEnable = False;
+
+        RefCntAutoPtr<IPipelineState> pPSO;
+        pDevice->CreateGraphicsPipelineState(PsoCI, &pPSO);
+        ASSERT_TRUE(pPSO);
+
+        constexpr float4 kColorFactor{1, 1, 1, 1};
+        if (PosType == SHADER_RESOURCE_VARIABLE_TYPE_STATIC)
+        {
+            IShaderResourceVariable* pVar = pPSO->GetStaticVariableByName(SHADER_TYPE_VERTEX, "cbInlineConstants");
+            ASSERT_TRUE(pVar);
+            pVar->SetInlineConstants(g_Positions, 0, kNumPosConstants);
+            pVar->SetInlineConstants(&kColorFactor, kNumPosConstants, 4);
+        }
+
+        RefCntAutoPtr<IShaderResourceBinding> pSRB;
+        pPSO->CreateShaderResourceBinding(&pSRB, true);
+        ASSERT_TRUE(pSRB);
+
+        IShaderResourceVariable* pVar = nullptr;
+        if (PosType != SHADER_RESOURCE_VARIABLE_TYPE_STATIC)
+        {
+            pVar = pSRB->GetVariableByName(SHADER_TYPE_VERTEX, "cbInlineConstants");
+            ASSERT_TRUE(pVar);
+            pVar->SetInlineConstants(&kColorFactor, kNumPosConstants, 4);
+        }
+
+        ITextureView* pRTVs[] = {pSwapChain->GetCurrentBackBufferRTV()};
+        pContext->SetRenderTargets(1, pRTVs, nullptr, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+        pContext->ClearRenderTarget(pRTVs[0], ClearColor, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+
+        pContext->CommitShaderResources(pSRB, RESOURCE_STATE_TRANSITION_MODE_TRANSITION);
+        pContext->SetPipelineState(pPSO);
+
+        if (pVar == nullptr)
+        {
+            // Draw both triangles as positions are static
+            pContext->Draw({6, DRAW_FLAG_VERIFY_ALL});
+        }
+        else
+        {
+            // Draw first triangle
+            pVar->SetInlineConstants(g_Positions, 0, kNumPosConstants / 2);
+            pContext->Draw({3, DRAW_FLAG_VERIFY_ALL});
+
+            // Draw second triangle
+            pVar->SetInlineConstants(g_Positions[0].Data() + kNumPosConstants / 2, 0, kNumPosConstants / 2);
+            pContext->Draw({3, DRAW_FLAG_VERIFY_ALL | DRAW_FLAG_DYNAMIC_RESOURCE_BUFFERS_INTACT});
+        }
+        Present();
+
+        std::cout << TestingEnvironment::GetCurrentTestStatusString() << ' '
+                  << " Pos " << GetShaderVariableTypeLiteralName(PosType) << std::endl;
     }
 }
 

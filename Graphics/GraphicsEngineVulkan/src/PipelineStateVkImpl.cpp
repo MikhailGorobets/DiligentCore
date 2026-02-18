@@ -566,23 +566,10 @@ MergedPushConstantMapType MergePushConstants(const PipelineStateVkImpl::TShaderS
                 const SPIRVShaderResourceAttribs& PCAttribs  = ShaderResources.GetPushConstant(i);
                 MergedPushConstantInfo&           MergedPC   = MergedPushConstants[PCAttribs.Name];
                 const Uint32                      BufferSize = PCAttribs.GetConstantBufferSize();
-                if (MergedPC.Stages == SHADER_TYPE_UNKNOWN)
-                {
-                    MergedPC.Stages = Stage.Type;
-                    MergedPC.Size   = BufferSize;
-                }
-                else if (MergedPC.Size == BufferSize)
-                {
-                    MergedPC.Stages |= Stage.Type;
-                }
-                else
-                {
-                    LOG_ERROR_AND_THROW("Push constant '", PCAttribs.Name,
-                                        "' is shared between multiple shaders in pipeline '", (PSOName ? PSOName : ""),
-                                        "', but its size varies (",
-                                        MergedPC.Size, " vs ", BufferSize,
-                                        "). A push constant shared between multiple shaders must have the same size in all shaders.");
-                }
+
+                // Combine push constants from all stages
+                MergedPC.Stages |= Stage.Type;
+                MergedPC.Size = std::max(MergedPC.Size, BufferSize);
             }
         }
     }
@@ -636,11 +623,11 @@ PipelineResourceSignatureDescWrapper PipelineStateVkImpl::GetDefaultResourceSign
     const PipelineResourceLayoutDesc& ResourceLayout,
     Uint32                            SRBAllocationGranularity) noexcept(false)
 {
-    PipelineResourceSignatureDescWrapper SignDesc{PSOName, ResourceLayout, SRBAllocationGranularity};
+    PipelineResourceSignatureDescWrapper                    SignDesc{PSOName, ResourceLayout, SRBAllocationGranularity};
+    DefaultSignatureDescBuilder<SPIRVShaderResourceAttribs> Builder{PSOName, ResourceLayout, VerifyResourceMerge, SignDesc};
 
     MergedPushConstantMapType MergedPushConstants;
 
-    std::unordered_map<ShaderResourceHashKey, const SPIRVShaderResourceAttribs&, ShaderResourceHashKey::Hasher> UniqueResources;
     for (const ShaderStageInfo& Stage : ShaderStages)
     {
         for (const ShaderStageInfo::Item& StageItem : Stage.Items)
@@ -659,6 +646,12 @@ PipelineResourceSignatureDescWrapper PipelineStateVkImpl::GetDefaultResourceSign
                     //    return;
                     //}
 
+                    if (Attribs.ArraySize == 0)
+                    {
+                        LOG_ERROR_AND_THROW("Resource '", Attribs.Name, "' in shader '", ShaderResources.GetShaderName(), "' is a runtime-sized array. ",
+                                            "You must use explicit resource signature to specify the array size.");
+                    }
+
                     const char* const SamplerSuffix =
                         (ShaderResources.IsUsingCombinedSamplers() && Attribs.Type == SPIRVShaderResourceAttribs::ResourceType::SeparateSampler) ?
                         ShaderResources.GetCombinedSamplerSuffix() :
@@ -676,7 +669,7 @@ PipelineResourceSignatureDescWrapper PipelineStateVkImpl::GetDefaultResourceSign
                         auto it = MergedPushConstants.find(VarDesc.Name);
                         if (it != MergedPushConstants.end())
                         {
-                            VERIFY_EXPR(Attribs.GetConstantBufferSize() == it->second.Size);
+                            VERIFY_EXPR(Attribs.GetConstantBufferSize() <= it->second.Size);
                             VarDesc.ShaderStages = it->second.Stages;
                         }
                         else
@@ -685,34 +678,19 @@ PipelineResourceSignatureDescWrapper PipelineStateVkImpl::GetDefaultResourceSign
                         }
                     }
 
+                    const SHADER_RESOURCE_TYPE    ResType = SPIRVShaderResourceAttribs::GetShaderResourceType(Attribs.Type);
+                    const PIPELINE_RESOURCE_FLAGS Flags   = SPIRVShaderResourceAttribs::GetPipelineResourceFlags(Attribs.Type) | ShaderVariableFlagsToPipelineResourceFlags(VarDesc.Flags);
+
+                    // For inline constants, ArraySize specifies the number of 32-bit constants,
+                    // not the array dimension. We need to calculate it from the buffer size.
+                    const Uint32 ArraySize = (Flags & PIPELINE_RESOURCE_FLAG_INLINE_CONSTANTS) ?
+                        Attribs.GetInlineConstantCountOrThrow(StageItem.pShader->GetDesc().Name) :
+                        Attribs.ArraySize;
+                    VERIFY((Flags & PIPELINE_RESOURCE_FLAG_INLINE_CONSTANTS) == 0 || (Flags == PIPELINE_RESOURCE_FLAG_INLINE_CONSTANTS),
+                           "INLINE_CONSTANTS flag cannot be combined with other flags.");
+
                     // Note that Attribs.Name != VarDesc.Name for combined samplers
-                    const auto it_assigned = UniqueResources.emplace(ShaderResourceHashKey{VarDesc.ShaderStages, Attribs.Name}, Attribs);
-                    if (it_assigned.second)
-                    {
-                        if (Attribs.ArraySize == 0)
-                        {
-                            LOG_ERROR_AND_THROW("Resource '", Attribs.Name, "' in shader '", ShaderResources.GetShaderName(), "' is a runtime-sized array. ",
-                                                "You must use explicit resource signature to specify the array size.");
-                        }
-
-                        const SHADER_RESOURCE_TYPE    ResType = SPIRVShaderResourceAttribs::GetShaderResourceType(Attribs.Type);
-                        const PIPELINE_RESOURCE_FLAGS Flags   = SPIRVShaderResourceAttribs::GetPipelineResourceFlags(Attribs.Type) | ShaderVariableFlagsToPipelineResourceFlags(VarDesc.Flags);
-
-                        Uint32 ArraySize = Attribs.ArraySize;
-                        if (Flags & PIPELINE_RESOURCE_FLAG_INLINE_CONSTANTS)
-                        {
-                            VERIFY(Flags == PIPELINE_RESOURCE_FLAG_INLINE_CONSTANTS, "INLINE_CONSTANTS flag cannot be combined with other flags.");
-                            // For inline constants, ArraySize specifies the number of 32-bit constants,
-                            // not the array dimension. We need to calculate it from the buffer size.
-                            ArraySize = Attribs.GetInlineConstantCountOrThrow(StageItem.pShader->GetDesc().Name);
-                        }
-
-                        SignDesc.AddResource(VarDesc.ShaderStages, Attribs.Name, ArraySize, ResType, VarDesc.Type, Flags);
-                    }
-                    else
-                    {
-                        VerifyResourceMerge(PSOName, it_assigned.first->second, Attribs);
-                    }
+                    Builder.AddResource(Attribs.Name, Attribs, VarDesc, ArraySize, ResType, Flags);
                 });
 
             // Merge combined sampler suffixes

@@ -307,35 +307,19 @@ struct PipelineStateWebGPUImpl::AsyncPipelineBuilder : public ObjectBase<IObject
     static void CreateRenderPipelineCallback(WGPUCreatePipelineAsyncStatus Status,
                                              WGPURenderPipeline            Pipeline,
                                              WGPUStringView                Message,
-                                             void*                         pUserData)
+                                             void*                         pUserData1,
+                                             void*                         pUserData2)
     {
-        static_cast<AsyncPipelineBuilder*>(pUserData)->InitializePipelines(Status, Pipeline, nullptr, Message);
-    }
-
-    static void CreateRenderPipelineCallback2(WGPUCreatePipelineAsyncStatus Status,
-                                              WGPURenderPipeline            Pipeline,
-                                              WGPUStringView                Message,
-                                              void*                         pUserData1,
-                                              void*                         pUserData2)
-    {
-        CreateRenderPipelineCallback(Status, Pipeline, Message, pUserData1);
+        static_cast<AsyncPipelineBuilder*>(pUserData1)->InitializePipelines(Status, Pipeline, nullptr, Message);
     }
 
     static void CreateComputePipelineCallback(WGPUCreatePipelineAsyncStatus Status,
                                               WGPUComputePipeline           Pipeline,
                                               WGPUStringView                Message,
-                                              void*                         pUserData)
+                                              void*                         pUserData1,
+                                              void*                         pUserData2)
     {
-        static_cast<AsyncPipelineBuilder*>(pUserData)->InitializePipelines(Status, nullptr, Pipeline, Message);
-    }
-
-    static void CreateComputePipelineCallback2(WGPUCreatePipelineAsyncStatus Status,
-                                               WGPUComputePipeline           Pipeline,
-                                               WGPUStringView                Message,
-                                               void*                         pUserData1,
-                                               void*                         pUserData2)
-    {
-        CreateComputePipelineCallback(Status, Pipeline, Message, pUserData1);
+        static_cast<AsyncPipelineBuilder*>(pUserData1)->InitializePipelines(Status, nullptr, Pipeline, Message);
     }
 };
 
@@ -444,7 +428,7 @@ void PipelineStateWebGPUImpl::InitializeWebGPURenderPipeline(const TShaderStages
 
         for (size_t Idx = 0; Idx < MaxBufferSlot + 1; ++Idx)
         {
-            wgpuVertexBufferLayouts[Idx].stepMode       = !wgpuVertexAttributes[Idx].empty() ? wgpuVertexBufferLayouts[Idx].stepMode : WGPUVertexStepMode_VertexBufferNotUsed;
+            wgpuVertexBufferLayouts[Idx].stepMode       = !wgpuVertexAttributes[Idx].empty() ? wgpuVertexBufferLayouts[Idx].stepMode : WGPUVertexStepMode_Undefined;
             wgpuVertexBufferLayouts[Idx].attributeCount = static_cast<uint32_t>(wgpuVertexAttributes[Idx].size());
             wgpuVertexBufferLayouts[Idx].attributes     = wgpuVertexAttributes[Idx].data();
         }
@@ -520,9 +504,6 @@ void PipelineStateWebGPUImpl::InitializeWebGPURenderPipeline(const TShaderStages
         wgpuRenderPipelineDesc.depthStencil = &wgpuDepthStencilState;
     }
 
-#if PLATFORM_WEB
-    WGPUPrimitiveDepthClipControl wgpuDepthClipControl{};
-#endif
     {
         const RasterizerStateDesc& RasterizerDesc = GraphicsPipeline.RasterizerDesc;
 
@@ -544,13 +525,7 @@ void PipelineStateWebGPUImpl::InitializeWebGPURenderPipeline(const TShaderStages
         {
             if (m_pDevice->GetDeviceInfo().Features.DepthClamp)
             {
-#if PLATFORM_WEB
-                wgpuDepthClipControl.chain.sType    = WGPUSType_PrimitiveDepthClipControl;
-                wgpuDepthClipControl.unclippedDepth = true;
-                wgpuPrimitiveState.nextInChain      = reinterpret_cast<WGPUChainedStruct*>(&wgpuDepthClipControl);
-#else
                 wgpuPrimitiveState.unclippedDepth = true;
-#endif
             }
             else
             {
@@ -571,18 +546,14 @@ void PipelineStateWebGPUImpl::InitializeWebGPURenderPipeline(const TShaderStages
     {
         // The reference will be released from the callback.
         AsyncBuilder->AddRef();
-#if PLATFORM_WEB
-        wgpuDeviceCreateRenderPipelineAsync(m_pDevice->GetWebGPUDevice(), &wgpuRenderPipelineDesc, AsyncPipelineBuilder::CreateRenderPipelineCallback, AsyncBuilder);
-#else
-        wgpuDeviceCreateRenderPipelineAsync2(m_pDevice->GetWebGPUDevice(), &wgpuRenderPipelineDesc,
-                                             {
-                                                 nullptr,
-                                                 WGPUCallbackMode_AllowSpontaneous,
-                                                 AsyncPipelineBuilder::CreateRenderPipelineCallback2,
-                                                 AsyncBuilder,
-                                                 nullptr,
-                                             });
-#endif
+        wgpuDeviceCreateRenderPipelineAsync(m_pDevice->GetWebGPUDevice(), &wgpuRenderPipelineDesc,
+                                            {
+                                                nullptr,
+                                                WGPUCallbackMode_AllowSpontaneous,
+                                                AsyncPipelineBuilder::CreateRenderPipelineCallback,
+                                                AsyncBuilder,
+                                                nullptr,
+                                            });
     }
     else
     {
@@ -619,18 +590,15 @@ void PipelineStateWebGPUImpl::InitializeWebGPUComputePipeline(const TShaderStage
     {
         // The reference will be released from the callback.
         AsyncBuilder->AddRef();
-#if PLATFORM_WEB
-        wgpuDeviceCreateComputePipelineAsync(m_pDevice->GetWebGPUDevice(), &wgpuComputePipelineDesc, AsyncPipelineBuilder::CreateComputePipelineCallback, AsyncBuilder);
-#else
-        wgpuDeviceCreateComputePipelineAsync2(m_pDevice->GetWebGPUDevice(), &wgpuComputePipelineDesc,
-                                              {
-                                                  nullptr,
-                                                  WGPUCallbackMode_AllowSpontaneous,
-                                                  AsyncPipelineBuilder::CreateComputePipelineCallback2,
-                                                  AsyncBuilder,
-                                                  nullptr,
-                                              });
-#endif
+
+        wgpuDeviceCreateComputePipelineAsync(m_pDevice->GetWebGPUDevice(), &wgpuComputePipelineDesc,
+                                             {
+                                                 nullptr,
+                                                 WGPUCallbackMode_AllowSpontaneous,
+                                                 AsyncPipelineBuilder::CreateComputePipelineCallback,
+                                                 AsyncBuilder,
+                                                 nullptr,
+                                             });
     }
     else
     {
@@ -748,9 +716,9 @@ PipelineResourceSignatureDescWrapper PipelineStateWebGPUImpl::GetDefaultResource
                                                                                               const PipelineResourceLayoutDesc& ResourceLayout,
                                                                                               Uint32                            SRBAllocationGranularity)
 {
-    PipelineResourceSignatureDescWrapper SignDesc{PSOName, ResourceLayout, SRBAllocationGranularity};
+    PipelineResourceSignatureDescWrapper                   SignDesc{PSOName, ResourceLayout, SRBAllocationGranularity};
+    DefaultSignatureDescBuilder<WGSLShaderResourceAttribs> Builder{PSOName, ResourceLayout, VerifyResourceMerge, SignDesc};
 
-    std::unordered_map<ShaderResourceHashKey, const WGSLShaderResourceAttribs&, ShaderResourceHashKey::Hasher> UniqueResources;
     for (const ShaderStageInfo& Stage : ShaderStages)
     {
         const ShaderWebGPUImpl*    pShader         = Stage.pShader;
@@ -759,49 +727,28 @@ PipelineResourceSignatureDescWrapper PipelineStateWebGPUImpl::GetDefaultResource
         ShaderResources.ProcessResources(
             [&](const WGSLShaderResourceAttribs& Attribs, Uint32) //
             {
+                if (Attribs.ArraySize == 0)
+                {
+                    LOG_ERROR_AND_THROW("Resource '", Attribs.Name, "' in shader '", pShader->GetDesc().Name, "' is a runtime-sized array. ",
+                                        "You must use explicit resource signature to specify the array size.");
+                }
+
                 const char* const SamplerSuffix =
                     (ShaderResources.IsUsingCombinedSamplers() && (Attribs.Type == WGSLShaderResourceAttribs::ResourceType::Sampler || Attribs.Type == WGSLShaderResourceAttribs::ResourceType::ComparisonSampler)) ?
                     ShaderResources.GetCombinedSamplerSuffix() :
                     nullptr;
 
-                const ShaderResourceVariableDesc VarDesc = FindPipelineResourceLayoutVariable(ResourceLayout, Attribs.Name, Stage.Type, SamplerSuffix);
+                const ShaderResourceVariableDesc VarDesc       = FindPipelineResourceLayoutVariable(ResourceLayout, Attribs.Name, Stage.Type, SamplerSuffix);
+                const PIPELINE_RESOURCE_FLAGS    Flags         = WGSLShaderResourceAttribs::GetPipelineResourceFlags(Attribs.Type) | ShaderVariableFlagsToPipelineResourceFlags(VarDesc.Flags);
+                const SHADER_RESOURCE_TYPE       ResType       = WGSLShaderResourceAttribs::GetShaderResourceType(Attribs.Type);
+                const WebGPUResourceAttribs      WebGPUAttribs = Attribs.GetWebGPUAttribs(VarDesc.Flags);
+
+                const Uint32 ArraySize = (Flags & PIPELINE_RESOURCE_FLAG_INLINE_CONSTANTS) ?
+                    Attribs.GetInlineConstantCountOrThrow() :
+                    Attribs.ArraySize;
+
                 // Note that Attribs.Name != VarDesc.Name for combined samplers
-                const auto it_assigned = UniqueResources.emplace(ShaderResourceHashKey{VarDesc.ShaderStages, Attribs.Name}, Attribs);
-                if (it_assigned.second)
-                {
-                    if (Attribs.ArraySize == 0)
-                    {
-                        LOG_ERROR_AND_THROW("Resource '", Attribs.Name, "' in shader '", pShader->GetDesc().Name, "' is a runtime-sized array. ",
-                                            "You must use explicit resource signature to specify the array size.");
-                    }
-
-                    const SHADER_RESOURCE_TYPE    ResType       = WGSLShaderResourceAttribs::GetShaderResourceType(Attribs.Type);
-                    const PIPELINE_RESOURCE_FLAGS Flags         = WGSLShaderResourceAttribs::GetPipelineResourceFlags(Attribs.Type) | ShaderVariableFlagsToPipelineResourceFlags(VarDesc.Flags);
-                    const WebGPUResourceAttribs   WebGPUAttribs = Attribs.GetWebGPUAttribs(VarDesc.Flags);
-
-                    Uint32 ArraySize = Attribs.ArraySize;
-                    if (Flags & PIPELINE_RESOURCE_FLAG_INLINE_CONSTANTS)
-                    {
-                        VERIFY(Flags == PIPELINE_RESOURCE_FLAG_INLINE_CONSTANTS, "INLINE_CONSTANTS flag cannot be combined with other flags.");
-                        VERIFY(Attribs.BufferStaticSize != 0, "BufferStaticSize must be non-zero for inline constants");
-                        VERIFY(Attribs.BufferStaticSize % sizeof(Uint32) == 0, "Buffer size must be a multiple of 4 bytes");
-                        // For inline constants, ArraySize must be the number of 32-bit constants
-                        ArraySize = Attribs.BufferStaticSize / sizeof(Uint32);
-
-                        if (ArraySize > MAX_INLINE_CONSTANTS)
-                        {
-                            LOG_ERROR_AND_THROW("Inline constants resource '", Attribs.Name, "' has ",
-                                                ArraySize, " constants. The maximum supported number of inline constants is ",
-                                                MAX_INLINE_CONSTANTS, '.');
-                        }
-                    }
-
-                    SignDesc.AddResource(VarDesc.ShaderStages, Attribs.Name, ArraySize, ResType, VarDesc.Type, Flags, WebGPUAttribs);
-                }
-                else
-                {
-                    VerifyResourceMerge(PSOName, it_assigned.first->second, Attribs);
-                }
+                Builder.AddResource(Attribs.Name, Attribs, VarDesc, ArraySize, ResType, Flags, WebGPUAttribs);
             });
 
         // Merge combined sampler suffixes
