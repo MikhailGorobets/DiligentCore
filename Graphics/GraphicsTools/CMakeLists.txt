@@ -77,6 +77,11 @@ if(DILIGENT_USE_OPENXR)
     list(APPEND INTERFACE interface/OpenXRUtilities.h)
 endif()
 
+if(DILIGENT_USE_COMPOSITOR_SERVICES)
+    list(APPEND SOURCE src/CompositorServicesUtilitiesMtl.mm)
+    list(APPEND INTERFACE interface/CompositorServicesUtilities.h)
+endif()
+
 set(DEPENDENCIES)
 
 if(D3D11_SUPPORTED)
@@ -162,6 +167,15 @@ endif()
 if(DILIGENT_USE_OPENXR)
     target_link_libraries(Diligent-GraphicsTools PRIVATE OpenXR::headers)
     target_compile_definitions(Diligent-GraphicsTools PUBLIC DILIGENT_USE_OPENXR=1)
+endif()
+
+if(DILIGENT_USE_COMPOSITOR_SERVICES)
+    find_library(COMPOSITOR_SERVICES_FRAMEWORK CompositorServices)
+    find_library(SPATIAL_FRAMEWORK Spatial)
+    if(COMPOSITOR_SERVICES_FRAMEWORK AND SPATIAL_FRAMEWORK)
+        target_link_libraries(Diligent-GraphicsTools PRIVATE ${COMPOSITOR_SERVICES_FRAMEWORK} ${SPATIAL_FRAMEWORK})
+    endif()
+    target_compile_definitions(Diligent-GraphicsTools PUBLIC DILIGENT_USE_COMPOSITOR_SERVICES=1)
 endif()
 
 if(D3D11_SUPPORTED OR D3D12_SUPPORTED)
