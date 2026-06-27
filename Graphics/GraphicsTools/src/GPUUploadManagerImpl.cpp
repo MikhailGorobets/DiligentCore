@@ -359,7 +359,10 @@ GPUUploadManagerImpl::Page::StagingTextureAtlas::StagingTextureAtlas(IRenderDevi
     TexDesc.CPUAccessFlags = CPU_ACCESS_WRITE;
 
     pDevice->CreateTexture(TexDesc, nullptr, &pTex);
-    VERIFY_EXPR(pTex);
+    if (!pTex)
+    {
+        LOG_ERROR_MESSAGE("Failed to create GPU upload manager staging texture '", Name, "'");
+    }
 }
 
 GPUUploadManagerImpl::Page::StagingTextureAtlas::~StagingTextureAtlas()
@@ -369,6 +372,9 @@ GPUUploadManagerImpl::Page::StagingTextureAtlas::~StagingTextureAtlas()
 
 void* GPUUploadManagerImpl::Page::StagingTextureAtlas::Map(IDeviceContext* pContext)
 {
+    if (!pTex)
+        return nullptr;
+
     pContext->TransitionResourceState({pTex, RESOURCE_STATE_UNKNOWN, RESOURCE_STATE_COPY_SOURCE, STATE_TRANSITION_FLAG_UPDATE_STATE});
     MappedTextureSubresource MappedData;
     pContext->MapTextureSubresource(pTex, 0, 0, MAP_WRITE, MAP_FLAG_NONE, nullptr, MappedData);
@@ -426,7 +432,10 @@ GPUUploadManagerImpl::Page::Page(UploadStream* pStream, IRenderDevice* pDevice, 
     Desc.Usage          = USAGE_STAGING;
     Desc.CPUAccessFlags = CPU_ACCESS_WRITE;
     pDevice->CreateBuffer(Desc, nullptr, &m_pStagingBuffer);
-    VERIFY_EXPR(m_pStagingBuffer != nullptr);
+    if (!m_pStagingBuffer)
+    {
+        LOG_ERROR_MESSAGE("Failed to create GPU upload manager staging buffer '", Name, "'");
+    }
 }
 
 GPUUploadManagerImpl::Page::Page(UploadStream* pStream, IRenderDevice* pDevice, Uint32 Size, TEXTURE_FORMAT Format) :
@@ -443,6 +452,11 @@ GPUUploadManagerImpl::Page::Page(UploadStream* pStream, IRenderDevice* pDevice, 
                 " (" + GetTextureFormatAttribs(Format).Name + ' ' + std::to_string(Size) + 'x' + std::to_string(Size) + ')'),
     }
 {
+}
+
+bool GPUUploadManagerImpl::Page::IsValid() const
+{
+    return (m_pStagingBuffer != nullptr) || (m_pStagingAtlas != nullptr && m_pStagingAtlas->IsValid());
 }
 
 GPUUploadManagerImpl::Page::~Page()
@@ -868,7 +882,7 @@ void GPUUploadManagerImpl::Page::ExecutePendingOps(IDeviceContext* pContext, Uin
     m_FenceValue = FenceValue;
 }
 
-void GPUUploadManagerImpl::Page::Reset(IDeviceContext* pContext)
+bool GPUUploadManagerImpl::Page::Reset(IDeviceContext* pContext)
 {
     VERIFY(DbgGetWriterCount() == 0, "All writers must finish before resetting the page");
     VERIFY(m_PendingOps.IsEmpty(), "All pending operations must be executed before resetting the page");
@@ -898,8 +912,14 @@ void GPUUploadManagerImpl::Page::Reset(IDeviceContext* pContext)
             m_pData = m_pStagingAtlas->Map(pContext);
         }
 
-        VERIFY_EXPR(m_pData != nullptr);
+        if (m_pData == nullptr)
+        {
+            LOG_ERROR_MESSAGE("Failed to map GPU upload manager staging page");
+            return false;
+        }
     }
+
+    return true;
 }
 
 bool GPUUploadManagerImpl::Page::TryEnqueue()
@@ -913,7 +933,7 @@ bool GPUUploadManagerImpl::Page::TryEnqueue()
 
 void GPUUploadManagerImpl::Page::Recycle()
 {
-    m_pStream->AddFreePage(this);
+    m_pStream->ReturnFreePage(this);
 }
 
 void GPUUploadManagerImpl::Page::ReleaseStagingBuffer(IDeviceContext* pContext)
@@ -1151,7 +1171,10 @@ GPUUploadManagerImpl::GPUUploadManagerImpl(IReferenceCounters* pRefCounters, con
     Desc.Name = "GPU upload manager fence";
     Desc.Type = FENCE_TYPE_CPU_WAIT_ONLY;
     m_pDevice->CreateFence(Desc, &m_pFence);
-    VERIFY_EXPR(m_pFence != nullptr);
+    if (!m_pFence)
+    {
+        LOG_ERROR_AND_THROW("Failed to create GPU upload manager fence");
+    }
 
     if (m_DeviceType == RENDER_DEVICE_TYPE_D3D11)
     {
@@ -1172,7 +1195,15 @@ void GPUUploadManagerImpl::UploadStream::ReleaseStagingBuffers(IDeviceContext* p
 
 void GPUUploadManagerImpl::UploadStream::SignalStop()
 {
-    m_PageRotatedSignal.RequestStop();
+    m_PagePoolChangedSignal.RequestStop();
+}
+
+void GPUUploadManagerImpl::UploadStream::ReturnFreePage(Page* pPage)
+{
+    // Publish the page before waking schedulers so a waiter that observes the tick
+    // can immediately acquire the returned page.
+    m_FreePages.Push(pPage);
+    m_PagePoolChangedSignal.Tick();
 }
 
 bool GPUUploadManagerImpl::TryBeginScheduleUpdate() noexcept
@@ -1233,24 +1264,43 @@ GPUUploadManagerImpl::ScheduleUpdateGuard::~ScheduleUpdateGuard()
         m_pMgr->EndScheduleUpdate();
 }
 
+bool GPUUploadManagerImpl::SetOrValidateContext(IDeviceContext* pContext, const char* MethodName)
+{
+    if (pContext == nullptr)
+    {
+        LOG_ERROR_MESSAGE("A valid context must be provided to ", MethodName, "()");
+        return false;
+    }
+
+    if (!m_pContext)
+    {
+        m_pContext = pContext;
+        return true;
+    }
+
+    if (pContext != m_pContext)
+    {
+        LOG_ERROR_MESSAGE("The context provided to ", MethodName, "() must be the same as the one already used by the GPUUploadManagerImpl");
+        return false;
+    }
+
+    return true;
+}
+
 void GPUUploadManagerImpl::Stop(IDeviceContext* pContext)
+{
+    if (!SetOrValidateContext(pContext, "Stop"))
+        return;
+
+    StopInternal(pContext);
+}
+
+void GPUUploadManagerImpl::StopInternal(IDeviceContext* pContext)
 {
     if (!SetStopping())
         return;
 
     m_Stopping.store(true, std::memory_order_release);
-
-    if (pContext != nullptr)
-    {
-        if (!m_pContext)
-            m_pContext = pContext;
-        else
-            DEV_CHECK_ERR(pContext == m_pContext, "The context provided to Stop must be the same as the one used to create the GPUUploadManagerImpl");
-    }
-    else
-    {
-        pContext = m_pContext;
-    }
 
     if (m_pTextureStreams)
     {
@@ -1274,15 +1324,18 @@ void GPUUploadManagerImpl::Stop(IDeviceContext* pContext)
     // the destructor so the application controls the thread/phase where the manager's device
     // context is touched. Keep streams and pages alive until destruction, because pending
     // operations still own callback payloads that must be released during teardown.
-    for (UploadStreamUniquePtr& Stream : m_Streams)
+    if (pContext != nullptr)
     {
-        Stream->ReleaseStagingBuffers(pContext);
+        for (UploadStreamUniquePtr& Stream : m_Streams)
+        {
+            Stream->ReleaseStagingBuffers(pContext);
+        }
     }
 }
 
 GPUUploadManagerImpl::~GPUUploadManagerImpl()
 {
-    Stop(m_pContext);
+    StopInternal(m_pContext);
 
     // Pending page pointers are owned by the streams below. The manager is terminally
     // destroyed, so discard the queue nodes before destroying the pages.
@@ -1293,22 +1346,14 @@ GPUUploadManagerImpl::~GPUUploadManagerImpl()
 
 void GPUUploadManagerImpl::RenderThreadUpdate(IDeviceContext* pContext)
 {
-    DEV_CHECK_ERR(pContext != nullptr, "A valid context must be provided to RenderThreadUpdate");
     if (m_Stopping.load(std::memory_order_acquire))
     {
         DEV_ERROR("GPU upload manager has been stopped");
         return;
     }
 
-    if (!m_pContext)
-    {
-        // If no context was provided at creation, we can accept any context in RenderThreadUpdate, but it must be the same across calls.
-        m_pContext = pContext;
-    }
-    else
-    {
-        DEV_CHECK_ERR(pContext == m_pContext, "The context provided to RenderThreadUpdate must be the same as the one used to create the GPUUploadManagerImpl");
-    }
+    if (!SetOrValidateContext(pContext, "RenderThreadUpdate"))
+        return;
 
     if (m_pTextureStreams)
     {
@@ -1359,19 +1404,21 @@ bool GPUUploadManagerImpl::UploadStream::ScheduleUpdate(IDeviceContext* pContext
                                                         const void*     pUpdateInfo,
                                                         bool            ScheduleUpdate(Page::Writer& Writer, const void* pUpdateInfo))
 {
-    DEV_CHECK_ERR(pContext == nullptr || pContext == m_Mgr.m_pContext,
-                  "If a context is provided to ScheduleBufferUpdate/ScheduleTextureUpdate, it must be the same as the "
-                  "one used to create the GPUUploadManagerImpl");
-
     bool IsFirstAttempt  = true;
     bool AbortUpdate     = false;
     bool UpdateScheduled = false;
 
     auto UpdatePendingSizeAndTryRotate = [&](Page* P) {
-        Uint64 PageEpoch = m_PageRotatedSignal.CurrentEpoch();
+        Uint64 PageEpoch = m_PagePoolChangedSignal.CurrentEpoch();
         // Note that for texture pages, UpdateSize is the texture dimension.
         if (!TryRotatePage(pContext, P, UpdateSize))
         {
+            if (pContext != nullptr)
+            {
+                AbortUpdate = true;
+                return;
+            }
+
             // Atomically update the max pending update size to ensure the next page is large enough
             AtomicMax(m_MaxPendingUpdateSize, UpdateSize, std::memory_order_acq_rel);
             if (IsFirstAttempt)
@@ -1379,7 +1426,7 @@ bool GPUUploadManagerImpl::UploadStream::ScheduleUpdate(IDeviceContext* pContext
                 m_TotalPendingUpdateSize.fetch_add(UpdateSize, std::memory_order_acq_rel);
                 IsFirstAttempt = false;
             }
-            AbortUpdate = m_PageRotatedSignal.WaitNext(PageEpoch) == 0;
+            AbortUpdate = m_PagePoolChangedSignal.WaitNext(PageEpoch) == 0;
         }
     };
 
@@ -1449,6 +1496,9 @@ bool GPUUploadManagerImpl::ScheduleBufferUpdate(const ScheduleBufferUpdateInfo& 
         return false;
     }
 
+    if (UpdateInfo.pContext != nullptr && !SetOrValidateContext(UpdateInfo.pContext, "ScheduleBufferUpdate"))
+        return false;
+
     if (!ValidateBufferUpdate(UpdateInfo))
         return false;
 
@@ -1485,6 +1535,9 @@ bool GPUUploadManagerImpl::ScheduleTextureUpdate(const ScheduleTextureUpdateInfo
         // through the guard so callback-owned user data is released.
         return false;
     }
+
+    if (UpdateInfo.pContext != nullptr && !SetOrValidateContext(UpdateInfo.pContext, "ScheduleTextureUpdate"))
+        return false;
 
     const bool HasCopyCallback =
         UseD3D11TextureCallback ?
@@ -1570,11 +1623,18 @@ GPUUploadManagerImpl::Page* GPUUploadManagerImpl::UploadStream::CreatePage(IDevi
         std::make_unique<Page>(this, m_Mgr.m_pDevice, PageSize, m_Format) :
         std::make_unique<Page>(this, m_Mgr.m_pDevice, PageSize);
 
+    if (!NewPage->IsValid())
+        return nullptr;
+
     Page* P = NewPage.get();
     if (pContext != nullptr)
     {
-        P->Reset(pContext);
+        if (!P->Reset(pContext))
+        {
+            return nullptr;
+        }
     }
+
     m_Pages.emplace(P, std::move(NewPage));
     m_PageSizeToCount[PageSize]++;
     m_PeakPageCount = std::max(m_PeakPageCount, static_cast<Uint32>(m_Pages.size()));
@@ -1621,7 +1681,7 @@ bool GPUUploadManagerImpl::UploadStream::TryRotatePage(IDeviceContext* pContext,
         // free list only if sealing observes no active writers; otherwise the
         // last writer will recycle the empty page through TryEnqueuePage().
         if (Fresh->TrySeal() == Page::SealStatus::Ready)
-            m_FreePages.Push(Fresh);
+            ReturnFreePage(Fresh);
         return true; // Rotation happened by someone else
     }
 
@@ -1629,7 +1689,7 @@ bool GPUUploadManagerImpl::UploadStream::TryRotatePage(IDeviceContext* pContext,
     if (ExpectedCurrent != nullptr && ExpectedCurrent->TrySeal() == Page::SealStatus::Ready)
         TryEnqueuePage(ExpectedCurrent);
 
-    m_PageRotatedSignal.Tick();
+    m_PagePoolChangedSignal.Tick();
     return true;
 }
 
@@ -1646,7 +1706,7 @@ bool GPUUploadManagerImpl::UploadStream::TryEnqueuePage(Page* P)
         else
         {
             P->Reset(nullptr);
-            m_FreePages.Push(P);
+            ReturnFreePage(P);
         }
         return true;
     }
@@ -1666,8 +1726,14 @@ void GPUUploadManagerImpl::ReclaimCompletedPages(IDeviceContext* pContext)
         Page* P = m_InFlightPages[i];
         if (P->GetFenceValue() <= CompletedFenceValue)
         {
-            P->Reset(pContext);
-            m_TmpPages.push_back(P);
+            if (P->Reset(pContext))
+            {
+                m_TmpPages.push_back(P);
+            }
+            else
+            {
+                m_InFlightPages[NewInFlightPageCount++] = P;
+            }
         }
         else
         {

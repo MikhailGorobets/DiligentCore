@@ -59,6 +59,8 @@ public:
     GPUUploadManagerImpl(IReferenceCounters* pRefCounters, const GPUUploadManagerCreateInfo& CI);
     ~GPUUploadManagerImpl();
 
+    IMPLEMENT_QUERY_INTERFACE_IN_PLACE(IID_GPUUploadManager, TBase);
+
     virtual void DILIGENT_CALL_TYPE RenderThreadUpdate(IDeviceContext* pContext) override final;
 
     virtual bool DILIGENT_CALL_TYPE ScheduleBufferUpdate(const ScheduleBufferUpdateInfo& UpdateInfo) override final;
@@ -149,7 +151,8 @@ public:
         void       Seal();
 
         void ExecutePendingOps(IDeviceContext* pContext, Uint64 FenceValue);
-        void Reset(IDeviceContext* pContext);
+        bool Reset(IDeviceContext* pContext);
+        bool IsValid() const;
 
         // Tries to set the page as enqueued for execution.
         // Returns true if the page was not previously enqueued, false otherwise.
@@ -212,6 +215,7 @@ public:
             void* Map(IDeviceContext* pContext);
             void  Unmap(IDeviceContext* pContext);
             void  Reset();
+            bool  IsValid() const { return pTex != nullptr; }
 
             DynamicAtlasManager::Region Allocate(Uint32 Width, Uint32 Height);
 
@@ -348,14 +352,14 @@ private:
         bool  TryEnqueuePage(Page* P);
         void  ProcessPagesToRelease(IDeviceContext* pContext);
         void  AddFreePages(IDeviceContext* pContext);
-        void  AddFreePage(Page* pPage) { m_FreePages.Push(pPage); }
+        void  ReturnFreePage(Page* pPage);
 
         bool ScheduleUpdate(IDeviceContext* pContext,
                             Uint32          UpdateSize,
                             const void*     pUpdateInfo,
                             bool            ScheduleUpdate(Page::Writer& Writer, const void* pUpdateInfo));
         void ReleaseStagingBuffers(IDeviceContext* pContext);
-        void SignalPageRotated() { m_PageRotatedSignal.Tick(); }
+        void SignalPageRotated() { m_PagePoolChangedSignal.Tick(); }
         void SignalStop();
 
         Uint32 GetPageSize() const { return m_PageSize; }
@@ -370,7 +374,7 @@ private:
 
         std::atomic<Page*> m_pCurrentPage{nullptr};
 
-        Threading::TickSignal m_PageRotatedSignal;
+        Threading::TickSignal m_PagePoolChangedSignal;
 
         std::unordered_map<Page*, std::unique_ptr<Page>> m_Pages;
         std::map<Uint32, Uint32>                         m_PageSizeToCount;
@@ -444,6 +448,9 @@ private:
     bool TryBeginScheduleUpdate() noexcept;
     void EndScheduleUpdate() noexcept;
     bool SetStopping() noexcept;
+    // Only call from context-owning paths: RenderThreadUpdate(), Stop(), or Schedule*Update() with non-null pContext.
+    bool SetOrValidateContext(IDeviceContext* pContext, const char* MethodName);
+    void StopInternal(IDeviceContext* pContext);
 
     static constexpr Uint32 SCHEDULE_STOP_BIT   = 0x80000000u;
     static constexpr Uint32 SCHEDULE_COUNT_MASK = ~SCHEDULE_STOP_BIT;

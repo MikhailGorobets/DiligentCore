@@ -174,6 +174,14 @@ if(ENABLE_SPIRV)
     PRIVATE
         spirv-cross-core
     )
+    if(TARGET spirv-cross-glsl)
+        target_link_libraries(Diligent-ShaderTools
+        PRIVATE
+            spirv-cross-glsl
+        )
+        target_compile_definitions(Diligent-ShaderTools PRIVATE DILIGENT_USE_SPIRV_CROSS_GLSL=1)
+    endif()
+
     if(SPIRV_CROSS_NAMESPACE_OVERRIDE)
         target_compile_definitions(Diligent-ShaderTools PUBLIC DILIGENT_SPIRV_CROSS_NAMESPACE=${SPIRV_CROSS_NAMESPACE_OVERRIDE})
     endif()
@@ -210,9 +218,7 @@ if(ENABLE_WGSL)
     target_link_libraries(Diligent-ShaderTools
     PRIVATE
         libtint
-        # We include this library because when building for Emscripten, libtint does not include this library in the dependency list
-        tint_lang_wgsl_inspector 
-    ) 
+    )
 endif()
 
 set(HLSL_DEFINITIONS include/HLSLDefinitions.fxh)
@@ -241,7 +247,11 @@ add_custom_command(OUTPUT ${HLSL_DEFINITIONS_INC} # We must use full path here!
                    VERBATIM
 )
 
-set_common_target_properties(Diligent-ShaderTools)
+if(ENABLE_WGSL)
+    set_common_target_properties(Diligent-ShaderTools 20)
+else()
+    set_common_target_properties(Diligent-ShaderTools)
+endif()
 
 source_group("src" FILES ${SOURCE})
 source_group("include" FILES ${INCLUDE})

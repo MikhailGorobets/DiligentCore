@@ -87,6 +87,12 @@ TEST(GPUUploadManagerTest, Creation)
     GPUUploadManagerCreateInfo       CreateInfo{pDevice, pContext};
     CreateGPUUploadManager(CreateInfo, &pUploadManager);
     ASSERT_TRUE(pUploadManager != nullptr);
+
+    RefCntAutoPtr<IObject> pObject{pUploadManager, IID_Unknown};
+    ASSERT_TRUE(pObject != nullptr);
+
+    RefCntAutoPtr<IGPUUploadManager> pQueriedManager{pObject, IID_GPUUploadManager};
+    EXPECT_EQ(pQueriedManager.RawPtr(), pUploadManager.RawPtr());
 }
 
 void VerifyBufferContents(IBuffer* pBuffer, const std::vector<Uint8>& ExpectedData)
@@ -794,8 +800,8 @@ TEST(GPUUploadManagerTest, StopReleasesBlockedBufferUpdates)
     RefCntAutoPtr<IBuffer> pBuffer = CreateUploadTestBuffer(pDevice, BufferData.size());
     ASSERT_NE(pBuffer, nullptr);
 
-    constexpr size_t         kNumThreads = 4;
-    constexpr size_t         kNumUpdates = kNumThreads * 2;
+    static constexpr size_t  kNumThreads = 4;
+    static constexpr size_t  kNumUpdates = kNumThreads * 2;
     std::vector<std::thread> Threads;
     std::atomic<Uint32>      NumUpdatesRunning{0};
     std::atomic<Uint32>      NumCopyCallbacks{0};
@@ -918,8 +924,8 @@ TEST(GPUUploadManagerTest, StopReleasesBlockedTextureUpdates)
     CreateGPUUploadManager(CreateInfo, &pUploadManager);
     ASSERT_TRUE(pUploadManager != nullptr);
 
-    constexpr size_t         kNumThreads = 4;
-    constexpr size_t         kNumUpdates = kNumThreads * 2;
+    static constexpr size_t  kNumThreads = 4;
+    static constexpr size_t  kNumUpdates = kNumThreads * 2;
     std::vector<std::thread> Threads;
     std::atomic<Uint32>      NumUpdatesRunning{0};
     std::atomic<Uint32>      NumCopyCallbacks{0};

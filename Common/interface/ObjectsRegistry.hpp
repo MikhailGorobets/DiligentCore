@@ -1,4 +1,4 @@
-/*  Copyright 2023-2025 Diligent Graphics LLC
+/*  Copyright 2023-2026 Diligent Graphics LLC
 
  *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -22,6 +22,8 @@
 #include <memory>
 #include <algorithm>
 #include <atomic>
+#include <vector>
+#include <utility>
 
 #include "../../Platforms/Basic/interface/DebugUtilities.hpp"
 #include "RefCntAutoPtr.hpp"
@@ -29,47 +31,52 @@
 namespace Diligent
 {
 
-template <typename StongPtrType>
-struct _StrongPtrHelper;
+namespace Details
+{
 
-// _StrongPtrHelper specialization for RefCntAutoPtr<T>
+template <typename StrongPtrType>
+struct StrongPtrHelper;
+
+// StrongPtrHelper specialization for RefCntAutoPtr<T>
 template <typename T>
-struct _StrongPtrHelper<typename Diligent::RefCntAutoPtr<T>>
+struct StrongPtrHelper<RefCntAutoPtr<T>>
 {
     using WeakPtrType = RefCntWeakPtr<T>;
 };
 
-// _StrongPtrHelper specialization for std::shared_ptr<T>
+// StrongPtrHelper specialization for std::shared_ptr<T>
 template <typename T>
-struct _StrongPtrHelper<std::shared_ptr<T>>
+struct StrongPtrHelper<std::shared_ptr<T>>
 {
     using WeakPtrType = std::weak_ptr<T>;
 };
 
 template <typename T>
-auto _LockWeakPtr(RefCntWeakPtr<T>& pWeakPtr)
+auto LockWeakPtr(RefCntWeakPtr<T>& pWeakPtr)
 {
     return pWeakPtr.Lock();
 }
 
 template <typename T>
-auto _LockWeakPtr(std::weak_ptr<T>& pWeakPtr)
+auto LockWeakPtr(std::weak_ptr<T>& pWeakPtr)
 {
     return pWeakPtr.lock();
 }
 
 
 template <typename T>
-auto _IsWeakPtrExpired(RefCntWeakPtr<T>& pWeakPtr)
+auto IsWeakPtrExpired(RefCntWeakPtr<T>& pWeakPtr)
 {
     return !pWeakPtr.IsValid();
 }
 
 template <typename T>
-auto _IsWeakPtrExpired(std::weak_ptr<T>& pWeakPtr)
+auto IsWeakPtrExpired(std::weak_ptr<T>& pWeakPtr)
 {
     return pWeakPtr.expired();
 }
+
+} // namespace Details
 
 /// A thread-safe and exception-safe object registry that works with std::shared_ptr or RefCntAutoPtr.
 /// The registry keeps weak pointers to the objects and returns strong pointers if the requested object exits.
@@ -106,6 +113,11 @@ auto _IsWeakPtrExpired(std::weak_ptr<T>& pWeakPtr)
 /// If the object is found, the initializer function is not called.
 ///
 /// It is guaranteed, that the Object will only be initialized once, even if multiple threads call Get() simultaneously.
+/// This guarantee does not apply to Get() calls that overlap with Clear(): such calls are safe, but an
+/// in-flight Get() may still return an object removed from the cache, and another Get() may initialize
+/// a different object for the same key after Clear().
+/// CreateObject may re-enter the registry for independent keys. Recursive creation of the same key, or
+/// cyclic creation dependencies between keys, may deadlock because each key is protected by a non-recursive mutex.
 ///
 template <typename KeyType,
           typename StrongPtrType,
@@ -114,11 +126,22 @@ template <typename KeyType,
 class ObjectsRegistry
 {
 public:
-    using WeakPtrType = typename _StrongPtrHelper<StrongPtrType>::WeakPtrType;
+    using WeakPtrType = typename Details::StrongPtrHelper<StrongPtrType>::WeakPtrType;
 
     explicit ObjectsRegistry(Uint32 NumRequestsToPurge = 1024) noexcept :
         m_NumRequestsToPurge{NumRequestsToPurge}
     {}
+
+#ifdef DILIGENT_OBJECTS_REGISTRY_TEST_HOOKS
+    using BeforeGetObjectCallbackType = void (*)(void* pUserData);
+
+    // Invoked after an ObjectWrapper has been copied from m_Cache and before locking it.
+    void SetBeforeGetObjectCallback(BeforeGetObjectCallbackType Callback, void* pUserData = nullptr)
+    {
+        m_BeforeGetObjectCallback     = Callback;
+        m_pBeforeGetObjectCallbackCtx = pUserData;
+    }
+#endif
 
     /// Finds the object in the registry and returns strong pointer to it (std::shared_ptr or RefCntAutoPtr).
     /// If the object is not found, it is atomically created using the provided initializer.
@@ -132,9 +155,8 @@ public:
     /// CreateObject function may throw in case of an error.
     ///
     /// It is guaranteed, that the Object will only be initialized once, even if multiple threads call Get() simultaneously.
-    /// However, if another thread runs an overloaded Get() without the initializer function with the same key, it may
-    /// remove the entry from the registry, and the object will be initialized multiple times.
-    /// This is OK as only one object will be added to the registry.
+    /// CreateObject may re-enter the registry for independent keys, but must not recursively request the same key
+    /// or form a cyclic dependency with another thread creating a different key.
     template <typename CreateObjectType>
     StrongPtrType Get(const KeyType&     Key,
                       CreateObjectType&& CreateObject // May throw
@@ -157,28 +179,33 @@ public:
         StrongPtrType pObject;
         try
         {
+#ifdef DILIGENT_OBJECTS_REGISTRY_TEST_HOOKS
+            if (m_BeforeGetObjectCallback != nullptr)
+                m_BeforeGetObjectCallback(m_pBeforeGetObjectCallbackCtx);
+#endif
             pObject = pObjectWrpr->Get(std::forward<CreateObjectType>(CreateObject));
         }
         catch (...)
         {
-            std::lock_guard<std::mutex> Guard{m_CacheMtx};
+            // Do not take ObjectWrapper's mutex while holding m_CacheMtx: CreateObject may re-enter
+            // the registry while another thread is waiting on this wrapper.
+            pObject = pObjectWrpr->Lock();
+            if (pObject)
+                return pObject;
 
-            auto it = m_Cache.find(Key);
-            if (it != m_Cache.end())
             {
-                pObject = it->second->Lock();
-                if (pObject)
-                {
-                    // The object was created by another thread while we were waiting for the lock
-                    return pObject;
-                }
-                else
-                {
-                    m_Cache.erase(it);
-                }
+                std::lock_guard<std::mutex> Guard{m_CacheMtx};
+                EraseObjectWrapperIfExpired(Key, pObjectWrpr);
             }
 
             throw;
+        }
+
+        if (!pObject)
+        {
+            // The initializer may have returned an empty pointer, but another thread may create
+            // the same object before we clean up the wrapper.
+            pObject = pObjectWrpr->Lock();
         }
 
         {
@@ -196,13 +223,7 @@ public:
             }
             else
             {
-                if (it != m_Cache.end())
-                {
-                    pObject = it->second->Lock();
-                    // Note that the object may have been created by another thread while we were waiting for the lock
-                    if (!pObject)
-                        m_Cache.erase(it);
-                }
+                EraseObjectWrapperIfExpired(Key, pObjectWrpr);
             }
 
             if (m_NumRequestsSinceLastPurge.fetch_add(1) + 1 >= m_NumRequestsToPurge)
@@ -221,26 +242,34 @@ public:
     /// or empty pointer otherwise.
     StrongPtrType Get(const KeyType& Key)
     {
-        std::lock_guard<std::mutex> Guard{m_CacheMtx};
-
-        if (m_NumRequestsSinceLastPurge.fetch_add(1) + 1 >= m_NumRequestsToPurge)
-            PurgeUnguarded();
-
-        auto it = m_Cache.find(Key);
-        if (it != m_Cache.end())
+        std::shared_ptr<ObjectWrapper> pObjectWrpr;
         {
-            auto pObject = it->second->Lock();
-            if (!pObject)
-            {
-                // Note that we may remove the entry from the cache while another thread is creating the object.
-                // This is OK as it will be added back to the cache.
-                m_Cache.erase(it);
-            }
+            std::lock_guard<std::mutex> Guard{m_CacheMtx};
 
-            return pObject;
+            if (m_NumRequestsSinceLastPurge.fetch_add(1) + 1 >= m_NumRequestsToPurge)
+                PurgeUnguarded();
+
+            auto it = m_Cache.find(Key);
+            if (it == m_Cache.end())
+                return {};
+
+            pObjectWrpr = it->second;
         }
 
-        return {};
+#ifdef DILIGENT_OBJECTS_REGISTRY_TEST_HOOKS
+        if (m_BeforeGetObjectCallback != nullptr)
+            m_BeforeGetObjectCallback(m_pBeforeGetObjectCallbackCtx);
+#endif
+        auto pObject = pObjectWrpr->Lock();
+        if (!pObject)
+        {
+            std::lock_guard<std::mutex> Guard{m_CacheMtx};
+            // An empty wrapper may still be used by Get(Key, CreateObject) after it
+            // copies the wrapper from m_Cache and before it enters ObjectWrapper::Get().
+            EraseObjectWrapperIfExpired(Key, pObjectWrpr);
+        }
+
+        return pObject;
     }
 
     /// Removes all expired pointers from the cache
@@ -254,17 +283,26 @@ public:
     template <typename HandlerType>
     void ProcessElements(HandlerType&& Handler)
     {
-        std::lock_guard<std::mutex> Guard{m_CacheMtx};
-        for (auto& Entry : m_Cache)
+        std::vector<std::pair<KeyType, std::shared_ptr<ObjectWrapper>>> Snapshot;
+
+        {
+            std::lock_guard<std::mutex> Guard{m_CacheMtx};
+
+            Snapshot.reserve(m_Cache.size());
+            for (auto& Entry : m_Cache)
+                Snapshot.emplace_back(Entry.first, Entry.second);
+        }
+
+        for (auto& Entry : Snapshot)
         {
             if (auto pObject = Entry.second->Lock())
-            {
                 Handler(Entry.first, *pObject);
-            }
         }
     }
 
     /// Removes all objects from the cache.
+    /// This method is safe to call concurrently with Get(), but it does not synchronize with in-flight
+    /// object creation. The create-once guarantee does not apply to Get() calls that overlap with Clear().
     void Clear()
     {
         std::lock_guard<std::mutex> Guard{m_CacheMtx};
@@ -277,12 +315,12 @@ private:
     {
     public:
         template <typename CreateObjectType>
-        const StrongPtrType Get(CreateObjectType&& CreateObject) noexcept(false)
+        StrongPtrType Get(CreateObjectType&& CreateObject) noexcept(false)
         {
             StrongPtrType pObject;
 
             std::lock_guard<std::mutex> Guard{m_CreateObjectMtx};
-            pObject = _LockWeakPtr(m_wpObject);
+            pObject = Details::LockWeakPtr(m_wpObject);
             if (!pObject)
             {
                 pObject    = CreateObject(); // May throw
@@ -294,12 +332,14 @@ private:
 
         StrongPtrType Lock()
         {
-            return _LockWeakPtr(m_wpObject);
+            std::lock_guard<std::mutex> Guard{m_CreateObjectMtx};
+            return Details::LockWeakPtr(m_wpObject);
         }
 
         bool IsExpired()
         {
-            return _IsWeakPtrExpired(m_wpObject);
+            std::lock_guard<std::mutex> Guard{m_CreateObjectMtx};
+            return Details::IsWeakPtrExpired(m_wpObject);
         }
 
     private:
@@ -311,7 +351,9 @@ private:
     {
         for (auto it = m_Cache.begin(); it != m_Cache.end();)
         {
-            if (it->second->IsExpired())
+            // Skip empty wrappers that are still referenced by Get(Key, CreateObject):
+            // removing them would allow another wrapper to be inserted for the same key.
+            if (!IsObjectWrapperInUse(it->second) && it->second->IsExpired())
             {
                 it = m_Cache.erase(it);
             }
@@ -324,6 +366,34 @@ private:
         m_NumRequestsSinceLastPurge.store(0);
     }
 
+    bool EraseObjectWrapperIfExpired(const KeyType& Key, const std::shared_ptr<ObjectWrapper>& pObjectWrpr)
+    {
+        auto it = m_Cache.find(Key);
+        if (it != m_Cache.end() &&
+            it->second == pObjectWrpr &&
+            !IsObjectWrapperInUse(it->second, pObjectWrpr.get()) &&
+            it->second->IsExpired())
+        {
+            m_Cache.erase(it);
+            return true;
+        }
+
+        return false;
+    }
+
+    static bool IsObjectWrapperInUse(const std::shared_ptr<ObjectWrapper>& pObjectWrpr,
+                                     const ObjectWrapper*                  pCurrentObjectWrpr = nullptr)
+    {
+        // m_CacheMtx must be held: ObjectWrapper references are copied from m_Cache under this mutex,
+        // so use_count() cannot grow while we make the erase decision.
+        // With no current Get(Key, CreateObject) call, m_Cache should be the only owner.
+        // When that call checks its own wrapper, it also holds pObjectWrpr locally, so the
+        // expected use count is 2. Any larger count means another thread may be using or
+        // initializing the wrapper, and erasing it could break the create-once guarantee.
+        const auto ExpectedUseCount = pObjectWrpr.get() == pCurrentObjectWrpr ? 2 : 1;
+        return pObjectWrpr.use_count() > ExpectedUseCount;
+    }
+
 private:
     using CacheType = std::unordered_map<KeyType, std::shared_ptr<ObjectWrapper>, KeyHasher, KeyEqual>;
 
@@ -333,6 +403,11 @@ private:
 
     std::mutex m_CacheMtx;
     CacheType  m_Cache;
+
+#ifdef DILIGENT_OBJECTS_REGISTRY_TEST_HOOKS
+    BeforeGetObjectCallbackType m_BeforeGetObjectCallback     = nullptr;
+    void*                       m_pBeforeGetObjectCallbackCtx = nullptr;
+#endif
 };
 
 } // namespace Diligent
