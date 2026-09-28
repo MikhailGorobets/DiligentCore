@@ -185,7 +185,12 @@ PRIVATE
 )
 
 if (PLATFORM_WEB)
-    target_link_options(Diligent-GraphicsEngineWebGPU-static PUBLIC "-pthread")
+    # Emscripten 6.0.10 still treats legacy exception invoke_* trampolines as
+    # suspending imports in JSPI builds. Static constructors run outside a
+    # WebAssembly.promising export and trap unless these indirect calls are ignored.
+    target_link_options(Diligent-GraphicsEngineWebGPU-static PUBLIC
+        "SHELL: -pthread -s JSPI=1 -s ASYNCIFY_IGNORE_INDIRECT=1"
+    )
 endif()
 
 target_compile_definitions(Diligent-GraphicsEngineWebGPU-shared PUBLIC DILIGENT_WEBGPU_SHARED=1)

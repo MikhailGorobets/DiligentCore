@@ -95,15 +95,24 @@ public:
 namespace
 {
 
-#if !PLATFORM_WEB
-
-void InstancePoolEvents(WGPUInstance wgpuInstance)
+void WaitForFuture(WGPUInstance wgpuInstance, WGPUFuture Future)
 {
-    wgpuInstanceProcessEvents(wgpuInstance);
+    WGPUFutureWaitInfo WaitInfo{};
+    WaitInfo.future             = Future;
+    const WGPUWaitStatus Status = wgpuInstanceWaitAny(wgpuInstance, 1, &WaitInfo, std::numeric_limits<Uint64>::max());
+    if (Status != WGPUWaitStatus_Success || !WaitInfo.completed)
+        LOG_ERROR_AND_THROW("Failed to wait for WebGPU request");
 }
 
 WebGPUInstanceWrapper InitializeWebGPUInstance(bool EnableUnsafe)
 {
+    const WGPUInstanceFeatureName RequiredFeature = WGPUInstanceFeatureName_TimedWaitAny;
+
+    WGPUInstanceDescriptor wgpuInstanceDesc{};
+    wgpuInstanceDesc.requiredFeatureCount = 1;
+    wgpuInstanceDesc.requiredFeatures     = &RequiredFeature;
+
+#if !PLATFORM_WEB
     struct SetDawnProcsHelper
     {
         SetDawnProcsHelper()
@@ -121,11 +130,10 @@ WebGPUInstanceWrapper InitializeWebGPUInstance(bool EnableUnsafe)
     wgpuDawnTogglesDesc.enabledToggleCount        = _countof(ToggleNames);
     wgpuDawnTogglesDesc.enabledToggles            = ToggleNames;
 
-    WGPUInstanceDescriptor wgpuInstanceDesc = {};
     if (EnableUnsafe)
-    {
         wgpuInstanceDesc.nextInChain = reinterpret_cast<WGPUChainedStruct*>(&wgpuDawnTogglesDesc);
-    }
+#endif
+
     WebGPUInstanceWrapper wgpuInstance{wgpuCreateInstance(&wgpuInstanceDesc)};
     if (!wgpuInstance)
         LOG_ERROR_AND_THROW("Failed to create WebGPU instance");
@@ -141,7 +149,6 @@ std::vector<WebGPUAdapterWrapper> FindCompatibleAdapters(WGPUInstance wgpuInstan
         WGPUAdapter              Adapter       = nullptr;
         WGPURequestAdapterStatus RequestStatus = {};
         String                   Message       = {};
-        bool                     IsReady       = {};
     };
 
     auto OnAdapterRequestEnded = [](WGPURequestAdapterStatus Status, WGPUAdapter Adapter, WGPUStringView Message, void* pCallbackUserData, void* pCallbackUserData2) {
@@ -150,7 +157,6 @@ std::vector<WebGPUAdapterWrapper> FindCompatibleAdapters(WGPUInstance wgpuInstan
             CallbackUserData* pUserData = static_cast<CallbackUserData*>(pCallbackUserData);
             pUserData->Adapter          = Adapter;
             pUserData->RequestStatus    = Status;
-            pUserData->IsReady          = true;
             if (WGPUStringViewValid(Message))
                 pUserData->Message = WGPUStringViewToString(Message);
         }
@@ -170,13 +176,11 @@ std::vector<WebGPUAdapterWrapper> FindCompatibleAdapters(WGPUInstance wgpuInstan
         Options.forceFallbackAdapter = false;
         Options.featureLevel         = WGPUFeatureLevel_Core;
         WGPURequestAdapterCallbackInfo CallbackInfo{};
-        CallbackInfo.mode      = WGPUCallbackMode_AllowProcessEvents;
-        CallbackInfo.callback  = OnAdapterRequestEnded;
-        CallbackInfo.userdata1 = &UserData;
-        wgpuInstanceRequestAdapter(wgpuInstance, &Options, CallbackInfo);
-
-        while (!UserData.IsReady)
-            InstancePoolEvents(wgpuInstance);
+        CallbackInfo.mode       = WGPUCallbackMode_WaitAnyOnly;
+        CallbackInfo.callback   = OnAdapterRequestEnded;
+        CallbackInfo.userdata1  = &UserData;
+        const WGPUFuture Future = wgpuInstanceRequestAdapter(wgpuInstance, &Options, CallbackInfo);
+        WaitForFuture(wgpuInstance, Future);
 
         if (UserData.RequestStatus == WGPURequestAdapterStatus_Success)
         {
@@ -270,7 +274,6 @@ WebGPUDeviceWrapper CreateDeviceForAdapter(const DeviceFeatures& Features, WGPUI
         WGPUDevice              Device        = nullptr;
         WGPURequestDeviceStatus RequestStatus = {};
         String                  Message       = {};
-        bool                    IsReady       = {};
     } UserData;
 
     auto OnDeviceRequestEnded = [](WGPURequestDeviceStatus Status, WGPUDevice Device, WGPUStringView Message, void* pCallbackUserData, void* pCallbackUserData2) {
@@ -279,12 +282,20 @@ WebGPUDeviceWrapper CreateDeviceForAdapter(const DeviceFeatures& Features, WGPUI
             CallbackUserData* pUserData = static_cast<CallbackUserData*>(pCallbackUserData);
             pUserData->Device           = Device;
             pUserData->RequestStatus    = Status;
-            pUserData->IsReady          = true;
             if (WGPUStringViewValid(Message))
                 pUserData->Message = WGPUStringViewToString(Message);
         }
     };
 
+    WGPUDeviceDescriptor DeviceDesc{};
+    DeviceDesc.requiredLimits                       = &SupportedLimits;
+    DeviceDesc.requiredFeatureCount                 = wgpuFeatures.size();
+    DeviceDesc.requiredFeatures                     = wgpuFeatures.data();
+    DeviceDesc.deviceLostCallbackInfo.mode          = WGPUCallbackMode_AllowSpontaneous;
+    DeviceDesc.deviceLostCallbackInfo.callback      = DeviceLostCallback;
+    DeviceDesc.uncapturedErrorCallbackInfo.callback = UncapturedErrorCallback;
+
+#if !PLATFORM_WEB
     // Keep timestamp conversion enabled: QueryWebGPUImpl reports a nanosecond frequency.
     const char* EnabledToggles[] = {
         "use_dxc",
@@ -301,29 +312,21 @@ WebGPUDeviceWrapper CreateDeviceForAdapter(const DeviceFeatures& Features, WGPUI
     wgpuDawnTogglesDesc.disabledToggleCount       = _countof(DisabledToggles);
     wgpuDawnTogglesDesc.disabledToggles           = DisabledToggles;
 
-    WGPUDeviceDescriptor DeviceDesc{};
-    DeviceDesc.requiredLimits              = &SupportedLimits;
-    DeviceDesc.requiredFeatureCount        = wgpuFeatures.size();
-    DeviceDesc.requiredFeatures            = wgpuFeatures.data();
-    DeviceDesc.deviceLostCallbackInfo      = {nullptr, WGPUCallbackMode_AllowSpontaneous, DeviceLostCallback};
-    DeviceDesc.uncapturedErrorCallbackInfo = {nullptr, UncapturedErrorCallback};
-    DeviceDesc.nextInChain                 = reinterpret_cast<WGPUChainedStruct*>(&wgpuDawnTogglesDesc);
-    WGPURequestDeviceCallbackInfo CallbackInfo{};
-    CallbackInfo.mode      = WGPUCallbackMode_AllowProcessEvents;
-    CallbackInfo.callback  = OnDeviceRequestEnded;
-    CallbackInfo.userdata1 = &UserData;
-    wgpuAdapterRequestDevice(wgpuAdapter, &DeviceDesc, CallbackInfo);
+    DeviceDesc.nextInChain = reinterpret_cast<WGPUChainedStruct*>(&wgpuDawnTogglesDesc);
+#endif
 
-    while (!UserData.IsReady)
-        InstancePoolEvents(wgpuInstance);
+    WGPURequestDeviceCallbackInfo CallbackInfo{};
+    CallbackInfo.mode       = WGPUCallbackMode_WaitAnyOnly;
+    CallbackInfo.callback   = OnDeviceRequestEnded;
+    CallbackInfo.userdata1  = &UserData;
+    const WGPUFuture Future = wgpuAdapterRequestDevice(wgpuAdapter, &DeviceDesc, CallbackInfo);
+    WaitForFuture(wgpuInstance, Future);
 
     if (UserData.RequestStatus != WGPURequestDeviceStatus_Success)
         LOG_ERROR_AND_THROW(UserData.Message);
 
     return WebGPUDeviceWrapper{UserData.Device};
 }
-
-#endif // !PLATFORM_WEB
 
 bool FeatureSupported(WGPUAdapter wgpuAdapter, WGPUDevice wgpuDevice, WGPUFeatureName Feature)
 {
@@ -541,10 +544,6 @@ void EngineFactoryWebGPUImpl::EnumerateAdapters(Version              MinVersion,
                                                 Uint32&              NumAdapters,
                                                 GraphicsAdapterInfo* Adapters) const
 {
-#if PLATFORM_WEB
-    NumAdapters = 0;
-    LOG_ERROR_MESSAGE("Synchronous adapter enumeration is not supported on the Web. Request an adapter asynchronously in JavaScript.");
-#else
     WebGPUInstanceWrapper             wgpuInstance = InitializeWebGPUInstance(true);
     std::vector<WebGPUAdapterWrapper> wgpuAdapters = FindCompatibleAdapters(wgpuInstance.Get(), MinVersion);
 
@@ -559,7 +558,6 @@ void EngineFactoryWebGPUImpl::EnumerateAdapters(Version              MinVersion,
             Adapters[AdapterId] = GetGraphicsAdapterInfo(wgpuAdapter.Get());
         }
     }
-#endif
 }
 
 void EngineFactoryWebGPUImpl::CreateDearchiver(const DearchiverCreateInfo& CreateInfo,
@@ -579,9 +577,6 @@ void EngineFactoryWebGPUImpl::CreateDeviceAndContextsWebGPU(const EngineWebGPUCr
     *ppDevice           = nullptr;
     *ppImmediateContext = nullptr;
 
-#if PLATFORM_WEB
-    LOG_ERROR_MESSAGE("Synchronous WebGPU device creation is not supported on the Web. Create the device asynchronously in JavaScript and use AttachToWebGPUDevice().");
-#else
     try
     {
         WebGPUInstanceWrapper             wgpuInstance = InitializeWebGPUInstance(true);
@@ -606,7 +601,6 @@ void EngineFactoryWebGPUImpl::CreateDeviceAndContextsWebGPU(const EngineWebGPUCr
     catch (const std::runtime_error&)
     {
     }
-#endif
 }
 
 void EngineFactoryWebGPUImpl::CreateSwapChainWebGPU(IRenderDevice*       pDevice,
