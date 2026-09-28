@@ -186,7 +186,11 @@ PRIVATE
 )
 
 if (PLATFORM_WEB)
-    target_link_options(Diligent-GraphicsEngineWebGPU-static PUBLIC "-pthread")
+    # Keep invoke_* wrappers synchronous: libc++ calls them from static constructors
+    # before the runtime enters main() through WebAssembly.promising.
+    target_link_options(Diligent-GraphicsEngineWebGPU-static PUBLIC
+        "SHELL: -pthread -s JSPI=1 -s ASYNCIFY_IGNORE_INDIRECT=1"
+    )
 endif()
 
 target_compile_definitions(Diligent-GraphicsEngineWebGPU-shared PUBLIC DILIGENT_WEBGPU_SHARED=1)
