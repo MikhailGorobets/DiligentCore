@@ -98,7 +98,8 @@ add_library(Diligent-GraphicsEngineWebGPUInterface INTERFACE)
 target_link_libraries     (Diligent-GraphicsEngineWebGPUInterface INTERFACE Diligent-GraphicsEngineInterface)
 target_include_directories(Diligent-GraphicsEngineWebGPUInterface INTERFACE interface)
 if(PLATFORM_WEB)
-    target_link_libraries(Diligent-GraphicsEngineWebGPUInterface INTERFACE emdawnwebgpu_c_include)
+    target_compile_options(Diligent-GraphicsEngineWebGPUInterface INTERFACE --use-port=emdawnwebgpu)
+    target_link_options(Diligent-GraphicsEngineWebGPUInterface INTERFACE --use-port=emdawnwebgpu)
 endif()
 
 add_library(Diligent-GraphicsEngineWebGPU-static STATIC 
@@ -138,9 +139,7 @@ else()
     list(APPEND PRIVATE_DEPENDENCIES SPIRV-Tools-opt)
 endif()
 
-if (PLATFORM_WEB)
-    list(APPEND PRIVATE_DEPENDENCIES emdawnwebgpu_c)
-else()
+if (NOT PLATFORM_WEB)
     list(APPEND PRIVATE_DEPENDENCIES dawn_native dawn_proc)
 endif()
 
