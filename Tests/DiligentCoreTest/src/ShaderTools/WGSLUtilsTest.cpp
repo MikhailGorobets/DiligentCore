@@ -87,7 +87,7 @@ float4 main(float3 Position : ATTRIB0) : SV_Position
 )";
 
     GLSLangUtils::InitializeGlslang();
-    auto SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk110, nullptr, nullptr);
+    auto SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk110, nullptr, nullptr, false);
     GLSLangUtils::FinalizeGlslang();
     ASSERT_FALSE(SPIRV.empty());
 
@@ -131,7 +131,7 @@ float4 main() : SV_Target
 }
 )";
     GLSLangUtils::InitializeGlslang();
-    auto SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk110, nullptr, nullptr);
+    auto SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk110, nullptr, nullptr, false);
     GLSLangUtils::FinalizeGlslang();
     return SPIRV;
 }
@@ -282,7 +282,7 @@ std::string HLSLtoWGLS(const char* FilePath)
     ShaderCI.pShaderSourceStreamFactory = pShaderSourceStreamFactory;
 
     GLSLangUtils::InitializeGlslang();
-    auto SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk100, nullptr, nullptr);
+    auto SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk100, nullptr, nullptr, false);
     GLSLangUtils::FinalizeGlslang();
 
     if (SPIRV.empty())

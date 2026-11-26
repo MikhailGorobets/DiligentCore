@@ -73,7 +73,8 @@ std::vector<unsigned int> GLSLtoSPIRV(const GLSLtoSPIRVAttribs& Attribs);
 std::vector<unsigned int> HLSLtoSPIRV(const ShaderCreateInfo& ShaderCI,
                                       SpirvVersion            Version,
                                       const char*             ExtraDefinitions,
-                                      IDataBlob**             ppCompilerOutput);
+                                      IDataBlob**             ppCompilerOutput,
+                                      bool                    NoStorageFormat);
 
 } // namespace GLSLangUtils
 

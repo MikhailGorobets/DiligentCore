@@ -397,7 +397,7 @@ std::vector<unsigned int> LoadSPIRVFromHLSL(const std::string& ShaderSource,
     }
     else
     {
-        SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk100, nullptr, nullptr);
+        SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk100, nullptr, nullptr, false);
     }
 
     return SPIRV;

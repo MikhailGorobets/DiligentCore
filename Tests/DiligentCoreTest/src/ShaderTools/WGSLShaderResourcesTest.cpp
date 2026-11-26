@@ -61,7 +61,7 @@ std::string HLSLtoWGLS(const char* FilePath, bool LoadUniformBufferReflection = 
     ShaderCI.pShaderSourceStreamFactory = pShaderSourceStreamFactory;
 
     GLSLangUtils::InitializeGlslang();
-    auto SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk100, nullptr, nullptr);
+    auto SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk100, nullptr, nullptr, false);
     GLSLangUtils::FinalizeGlslang();
 
     if (SPIRV.empty())

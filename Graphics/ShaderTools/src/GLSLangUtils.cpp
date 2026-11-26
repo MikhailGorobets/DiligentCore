@@ -464,7 +464,8 @@ static SPIRV_OPTIMIZATION_FLAGS GetSpirvPerformanceFlag(SHADER_OPTIMIZATION_LEVE
 std::vector<unsigned int> HLSLtoSPIRV(const ShaderCreateInfo& ShaderCI,
                                       SpirvVersion            Version,
                                       const char*             ExtraDefinitions,
-                                      IDataBlob**             ppCompilerOutput)
+                                      IDataBlob**             ppCompilerOutput,
+                                      bool                    NoStorageFormat)
 {
     EShLanguage        ShLang = ShaderTypeToShLanguage(ShaderCI.Desc.ShaderType);
     ::glslang::TShader Shader{ShLang};
@@ -483,6 +484,7 @@ std::vector<unsigned int> HLSLtoSPIRV(const ShaderCreateInfo& ShaderCI,
     Shader.setHlslIoMapping(true);
     Shader.setEntryPoint(ShaderCI.EntryPoint);
     Shader.setEnvTargetHlslFunctionality1();
+    Shader.setNoStorageFormat(NoStorageFormat);
 
     const ShaderSourceFileData SourceData = ReadShaderSourceFile(ShaderCI);
 

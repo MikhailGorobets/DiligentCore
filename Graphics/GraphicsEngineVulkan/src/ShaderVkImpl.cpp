@@ -100,7 +100,7 @@ std::vector<uint32_t> CompileShaderGLSLang(const ShaderCreateInfo&         Shade
 #else
     if (ShaderCI.SourceLanguage == SHADER_SOURCE_LANGUAGE_HLSL && (ShaderCI.CompileFlags & SHADER_COMPILE_FLAG_HLSL_TO_SPIRV_VIA_GLSL) == 0)
     {
-        SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk100, VulkanDefine, VkShaderCI.ppCompilerOutput);
+        SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk100, VulkanDefine, VkShaderCI.ppCompilerOutput, true);
     }
     else
     {

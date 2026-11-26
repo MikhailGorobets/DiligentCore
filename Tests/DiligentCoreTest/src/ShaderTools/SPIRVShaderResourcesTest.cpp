@@ -121,7 +121,7 @@ std::vector<unsigned int> LoadSPIRVFromHLSL(const char*     FilePath,
     }
     else
     {
-        SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk100, nullptr, nullptr);
+        SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk100, nullptr, nullptr, false);
     }
 
     return SPIRV;
@@ -774,7 +774,7 @@ TEST_F(SPIRVShaderResourcesTest, NestedLocalAndSystemIncludesFromMemory_HLSL_GLS
     ShaderCI.pShaderSourceStreamFactory = pShaderSourceFactory;
     ShaderCI.ShaderOptimizationLevel    = SHADER_OPTIMIZATION_LEVEL_DISABLED;
 
-    auto SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk100, nullptr, nullptr);
+    auto SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk100, nullptr, nullptr, false);
     EXPECT_FALSE(SPIRV.empty());
 }
 

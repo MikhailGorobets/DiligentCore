@@ -67,7 +67,7 @@ std::vector<uint32_t> CompileShaderToSPIRV(const ShaderCreateInfo&             S
 #else
     if (ShaderCI.SourceLanguage == SHADER_SOURCE_LANGUAGE_HLSL)
     {
-        SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk100, WebGPUDefine, WebGPUShaderCI.ppCompilerOutput);
+        SPIRV = GLSLangUtils::HLSLtoSPIRV(ShaderCI, GLSLangUtils::SpirvVersion::Vk100, WebGPUDefine, WebGPUShaderCI.ppCompilerOutput, false);
 
         SPIRVShaderResources::CreateInfo ResCI;
         ResCI.ShaderType                  = ShaderCI.Desc.ShaderType;
